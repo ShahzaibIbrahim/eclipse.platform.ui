@@ -148,6 +148,11 @@ public class FilteredTree extends Composite {
 	private static final long SOFT_MAX_EXPAND_TIME = 200;
 
 	/**
+	 * Time for refresh job delay in terms of expansion in long value
+	 */
+	private long refreshJobDelay = 200;
+
+	/**
 	 * Create a new instance of the receiver. Subclasses that wish to override the
 	 * default creation behavior may use this constructor, but must ensure that the
 	 * <code>init(composite, int, PatternFilter)</code> method is called in the
@@ -755,7 +760,7 @@ public class FilteredTree extends Composite {
 	 * @since 3.5
 	 */
 	protected long getRefreshJobDelay() {
-		return 200;
+		return refreshJobDelay;
 	}
 
 	/**
@@ -786,6 +791,16 @@ public class FilteredTree extends Composite {
 			this.filterText.setText(filterText);
 			selectAll();
 		}
+	}
+
+	/**
+	 * Override the default refresh job delay
+	 *
+	 * @param time
+	 * @since 3.132
+	 */
+	public void setRefreshJobDelay(long time) {
+		this.refreshJobDelay = time;
 	}
 
 	/**
