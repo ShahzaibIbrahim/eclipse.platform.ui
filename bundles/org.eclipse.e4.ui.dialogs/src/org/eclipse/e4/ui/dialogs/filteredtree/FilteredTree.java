@@ -115,16 +115,16 @@ public class FilteredTree extends Composite {
 	/**
 	 * Create a new instance of the receiver.
 	 *
-	 * @param parent          the parent <code>Composite</code>
-	 * @param treeStyle       the style bits for the <code>Tree</code>
-	 * @param filter          the filter to be used
-	 * @param refreshJobDelay refresh delay in ms, the time to expand the tree after
-	 *                        debounce
+	 * @param parent               the parent <code>Composite</code>
+	 * @param treeStyle            the style bits for the <code>Tree</code>
+	 * @param filter               the filter to be used
+	 * @param refreshDelayInMillis refresh delay in ms, the time to expand the tree
+	 *                             after debounce
 	 * @since 1.4
 	 */
-	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter, long refreshJobDelay) {
+	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter, long refreshDelayInMillis) {
 		super(parent, SWT.NONE);
-		this.refreshJobDelay = refreshJobDelay;
+		this.refreshJobDelay = refreshDelayInMillis;
 		init(treeStyle, filter);
 	}
 
