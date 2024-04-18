@@ -150,7 +150,12 @@ public class FilteredTree extends Composite {
 	/**
 	 * Time for refresh job delay in terms of expansion in long value
 	 */
-	private long refreshJobDelay = 200;
+	private final long refreshJobDelay;
+
+	/**
+	 * Default time for refresh job delay in ms
+	 */
+	private static final long DEFAULT_REFRESH_TIME = 200;
 
 	/**
 	 * Create a new instance of the receiver. Subclasses that wish to override the
@@ -176,9 +181,20 @@ public class FilteredTree extends Composite {
 	public FilteredTree(Composite parent, boolean useNewLook, boolean useFastHashLookup) {
 		super(parent, SWT.NONE);
 		this.parent = parent;
+		this.refreshJobDelay = DEFAULT_REFRESH_TIME;
 		if (treeViewer != null) {
 			treeViewer.setUseHashlookup(useFastHashLookup);
 		}
+	}
+
+	/**
+	 * Calls
+	 * {@link #FilteredTree(Composite, int, PatternFilter, boolean, boolean, long)}
+	 * with a default refresh time
+	 */
+	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter, boolean useNewLook,
+			boolean useFastHashLookup) {
+		this(parent, treeStyle, filter, useNewLook, useFastHashLookup, DEFAULT_REFRESH_TIME);
 	}
 
 	/**
@@ -200,12 +216,15 @@ public class FilteredTree extends Composite {
 	 *                          the tree should be slow but working for data with
 	 *                          mutable or broken hashcode implementation. Only used
 	 *                          if treeViewer is already initialized
-	 * @since 3.116
+	 * @param refreshJobDelay   refresh delay in ms, the time to expand the tree
+	 *                          after debounce
+	 * @since 3.132
 	 */
 	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter, boolean useNewLook,
-			boolean useFastHashLookup) {
+			boolean useFastHashLookup, long refreshJobDelay) {
 		super(parent, SWT.NONE);
 		this.parent = parent;
+		this.refreshJobDelay = refreshJobDelay;
 		init(treeStyle, filter);
 		if (treeViewer != null) {
 			treeViewer.setUseHashlookup(useFastHashLookup);
@@ -236,6 +255,7 @@ public class FilteredTree extends Composite {
 	@Deprecated
 	protected FilteredTree(Composite parent) {
 		super(parent, SWT.NONE);
+		this.refreshJobDelay = DEFAULT_REFRESH_TIME;
 		this.parent = parent;
 	}
 
@@ -265,6 +285,7 @@ public class FilteredTree extends Composite {
 	@Deprecated
 	protected FilteredTree(Composite parent, boolean useNewLook) {
 		super(parent, SWT.NONE);
+		this.refreshJobDelay = DEFAULT_REFRESH_TIME;
 		this.parent = parent;
 	}
 
@@ -288,6 +309,7 @@ public class FilteredTree extends Composite {
 	@Deprecated
 	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter) {
 		super(parent, SWT.NONE);
+		this.refreshJobDelay = DEFAULT_REFRESH_TIME;
 		this.parent = parent;
 		init(treeStyle, filter);
 	}
@@ -315,6 +337,7 @@ public class FilteredTree extends Composite {
 	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter, boolean useNewLook) {
 		super(parent, SWT.NONE);
 		this.parent = parent;
+		this.refreshJobDelay = DEFAULT_REFRESH_TIME;
 		init(treeStyle, filter);
 	}
 
@@ -793,15 +816,6 @@ public class FilteredTree extends Composite {
 		}
 	}
 
-	/**
-	 * Override the default refresh job delay
-	 *
-	 * @param time
-	 * @since 3.132
-	 */
-	public void setRefreshJobDelay(long time) {
-		this.refreshJobDelay = time;
-	}
 
 	/**
 	 * Returns the pattern filter used by this tree.
