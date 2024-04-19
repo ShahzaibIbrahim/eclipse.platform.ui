@@ -811,7 +811,6 @@ public class FilteredTree extends Composite {
 		}
 	}
 
-
 	/**
 	 * Returns the pattern filter used by this tree.
 	 *
