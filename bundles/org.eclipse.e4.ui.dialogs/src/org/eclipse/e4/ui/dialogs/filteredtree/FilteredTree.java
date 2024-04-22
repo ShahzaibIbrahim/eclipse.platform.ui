@@ -103,9 +103,10 @@ public class FilteredTree extends Composite {
 	private static final long SOFT_MAX_EXPAND_TIME = 200;
 
 	/**
-	 * Time for refresh job delay in terms of expansion in long value
+	 * Time delay after which the search is triggered, acting as a debounce
+	 * mechanism.
 	 */
-	private final long refreshJobDelay;
+	private final long refreshJobDelayInMillis;
 
 	/**
 	 * Default time for refresh job delay in ms
@@ -115,16 +116,16 @@ public class FilteredTree extends Composite {
 	/**
 	 * Create a new instance of the receiver.
 	 *
-	 * @param parent               the parent <code>Composite</code>
-	 * @param treeStyle            the style bits for the <code>Tree</code>
-	 * @param filter               the filter to be used
-	 * @param refreshDelayInMillis refresh delay in ms, the time to expand the tree
-	 *                             after debounce
-	 * @since 1.4
+	 * @param parent           the parent <code>Composite</code>
+	 * @param treeStyle        the style bits for the <code>Tree</code>
+	 * @param filter           the filter to be used
+	 * @param refreshDelayTime refresh delay in ms, the time to expand the tree
+	 *                         after debounce
+	 * @since 1.5
 	 */
-	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter, long refreshDelayInMillis) {
+	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter, long refreshDelayTime) {
 		super(parent, SWT.NONE);
-		this.refreshJobDelay = refreshDelayInMillis;
+		this.refreshJobDelayInMillis = refreshDelayTime;
 		init(treeStyle, filter);
 	}
 
@@ -148,7 +149,7 @@ public class FilteredTree extends Composite {
 	 */
 	protected FilteredTree(Composite parent) {
 		super(parent, SWT.NONE);
-		this.refreshJobDelay = DEFAULT_REFRESH_TIME;
+		this.refreshJobDelayInMillis = DEFAULT_REFRESH_TIME;
 	}
 
 	/**
@@ -560,7 +561,7 @@ public class FilteredTree extends Composite {
 	 * @since 3.5
 	 */
 	protected long getRefreshJobDelay() {
-		return refreshJobDelay;
+		return refreshJobDelayInMillis;
 	}
 
 	/**

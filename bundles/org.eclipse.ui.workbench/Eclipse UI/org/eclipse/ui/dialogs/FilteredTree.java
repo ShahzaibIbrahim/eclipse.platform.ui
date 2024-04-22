@@ -150,7 +150,7 @@ public class FilteredTree extends Composite {
 	/**
 	 * Time for refresh job delay in terms of expansion in long value
 	 */
-	private final long refreshJobDelay;
+	private final long refreshJobDelayInMillis;
 
 	/**
 	 * Default time for refresh job delay in ms
@@ -181,7 +181,7 @@ public class FilteredTree extends Composite {
 	public FilteredTree(Composite parent, boolean useNewLook, boolean useFastHashLookup) {
 		super(parent, SWT.NONE);
 		this.parent = parent;
-		this.refreshJobDelay = DEFAULT_REFRESH_TIME;
+		this.refreshJobDelayInMillis = DEFAULT_REFRESH_TIME;
 		if (treeViewer != null) {
 			treeViewer.setUseHashlookup(useFastHashLookup);
 		}
@@ -210,23 +210,24 @@ public class FilteredTree extends Composite {
 	 *
 	 * </p>
 	 *
-	 * @param parent               the parent <code>Composite</code>
-	 * @param treeStyle            the style bits for the <code>Tree</code>
-	 * @param filter               the filter to be used
-	 * @param useNewLook           ignored, keep for API compliance
-	 * @param useFastHashLookup    true, if tree should use fast hash lookup, false,
-	 *                             if the tree should be slow but working for data
-	 *                             with mutable or broken hashcode implementation.
-	 *                             Only used if treeViewer is already initialized
-	 * @param refreshDelayInMillis refresh delay in ms, the time to expand the tree
-	 *                             after debounce
+	 * @param parent                  the parent <code>Composite</code>
+	 * @param treeStyle               the style bits for the <code>Tree</code>
+	 * @param filter                  the filter to be used
+	 * @param useNewLook              ignored, keep for API compliance
+	 * @param useFastHashLookup       true, if tree should use fast hash lookup,
+	 *                                false, if the tree should be slow but working
+	 *                                for data with mutable or broken hashcode
+	 *                                implementation. Only used if treeViewer is
+	 *                                already initialized
+	 * @param refreshJobDelayInMillis refresh delay in ms, the time to expand the
+	 *                                tree after debounce
 	 * @since 3.132
 	 */
 	public FilteredTree(Composite parent, int treeStyle, PatternFilter filter, boolean useNewLook,
-			boolean useFastHashLookup, long refreshDelayInMillis) {
+			boolean useFastHashLookup, long refreshJobDelayInMillis) {
 		super(parent, SWT.NONE);
 		this.parent = parent;
-		this.refreshJobDelay = refreshDelayInMillis;
+		this.refreshJobDelayInMillis = refreshJobDelayInMillis;
 		init(treeStyle, filter);
 		if (treeViewer != null) {
 			treeViewer.setUseHashlookup(useFastHashLookup);
@@ -257,7 +258,7 @@ public class FilteredTree extends Composite {
 	@Deprecated
 	protected FilteredTree(Composite parent) {
 		super(parent, SWT.NONE);
-		this.refreshJobDelay = DEFAULT_REFRESH_TIME;
+		this.refreshJobDelayInMillis = DEFAULT_REFRESH_TIME;
 		this.parent = parent;
 	}
 
@@ -778,7 +779,7 @@ public class FilteredTree extends Composite {
 	 * @since 3.5
 	 */
 	protected long getRefreshJobDelay() {
-		return refreshJobDelay;
+		return refreshJobDelayInMillis;
 	}
 
 	/**
