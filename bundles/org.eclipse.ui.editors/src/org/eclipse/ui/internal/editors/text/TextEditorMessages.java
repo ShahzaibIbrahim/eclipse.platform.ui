@@ -35,6 +35,8 @@ final class TextEditorMessages extends NLS {
 	public static String LinkedModeConfigurationBlock_DASHED_BOX;
 	public static String TextEditorPreferencePage_displayedTabWidth;
 	public static String TextEditorPreferencePage_lineSpacing;
+	public static String TextEditorPreferencePage_useFindReplaceOverlay;
+	public static String TextEditorPreferencePage_showFindReplaceOverlayAtBottom;
 	public static String TextEditorPreferencePage_enableWordWrap;
 	public static String TextEditorPreferencePage_convertTabsToSpaces;
 	public static String TextEditorPreferencePage_undoHistorySize;
@@ -165,6 +167,9 @@ final class TextEditorMessages extends NLS {
 	public static String TextEditorDefaultsPreferencePage_showWhitespaceCharactersDialogInvalidInput;
 	public static String TextEditorDefaultsPreferencePage_showWhitespaceCharactersDialogTitle;
 	public static String TextEditorDefaultsPreferencePage_space;
+	public static String TextEditorDefaultsPreferencePage_stickyScrollingEnabled;
+	public static String TextEditorDefaultsPreferencePage_stickyScrollingMaximumCount;
+	public static String TextEditorDefaultsPreferencePage_stickyScrollingMaximumCount_description;
 	public static String TextEditorDefaultsPreferencePage_tab;
 	public static String TextEditorDefaultsPreferencePage_textDragAndDrop;
 	public static String TextEditorDefaultsPreferencePage_trailing;

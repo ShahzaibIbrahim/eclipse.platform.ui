@@ -220,6 +220,30 @@ public class AbstractDecoratedTextEditorPreferenceConstants {
 	 * </p>
 	 */
 	public final static String EDITOR_LINE_NUMBER_RULER= "lineNumberRuler"; //$NON-NLS-1$
+	
+	/**
+	 * A named preference that controls whether the find/replace overlay is used in place of the
+	 * dialog.
+	 * 
+	 * <p>
+	 * The preference value is of type <code>Boolean</code>
+	 * </p>
+	 * 
+	 * @since 3.18
+	 */
+	public final static String EDITOR_USE_FIND_REPLACE_OVERLAY= "useFindReplaceOverlay"; //$NON-NLS-1$
+
+	/**
+	 * A named preference that controls whether the editor overlay to access find and replace
+	 * functionality should be aligned to the bottom of the editor page instead of to the top.
+	 * 
+	 * <p>
+	 * The preference value is of type <code>Boolean</code>
+	 * </p>
+	 * 
+	 * @since 3.18
+	 */
+	public final static String EDITOR_FIND_REPLACE_OVERLAY_AT_BOTTOM= "findReplaceOverlayAtBottom"; //$NON-NLS-1$
 
 	/**
 	 * A named preference that controls if the caret offset is shown in the status line.
@@ -718,11 +742,27 @@ public class AbstractDecoratedTextEditorPreferenceConstants {
 	public static final String EDITOR_HOVER_ENRICH_MODE= AbstractTextEditor.PREFERENCE_HOVER_ENRICH_MODE;
 
 	/**
+	 * A named preference that controls if sticky scrolling should be enabled.
+	 * 
+	 * @since 3.18
+	 */
+	public static final String EDITOR_STICKY_SCROLLING_ENABLED= "stickyScrollingEnabled"; //$NON-NLS-1$
+
+	/**
+	 * A named preference that controls the maximum count of sticky lines.
+	 * 
+	 * @since 3.18
+	 */
+	public static final String EDITOR_STICKY_SCROLLING_MAXIMUM_COUNT= "stickyScrollingMaximumCount"; //$NON-NLS-1$
+
+	/**
 	* Initializes the given preference store with the default values.
 	 *
 	* @param store the preference store to be initialized
 	*/
 	public static void initializeDefaultValues(IPreferenceStore store) {
+		store.setDefault(AbstractDecoratedTextEditorPreferenceConstants.EDITOR_USE_FIND_REPLACE_OVERLAY, true);
+		store.setDefault(AbstractDecoratedTextEditorPreferenceConstants.EDITOR_FIND_REPLACE_OVERLAY_AT_BOTTOM, false);
 		store.setDefault(AbstractDecoratedTextEditorPreferenceConstants.USE_ANNOTATIONS_PREFERENCE_PAGE, false);
 		store.setDefault(AbstractDecoratedTextEditorPreferenceConstants.USE_QUICK_DIFF_PREFERENCE_PAGE, false);
 
@@ -817,6 +857,9 @@ public class AbstractDecoratedTextEditorPreferenceConstants {
 		store.setDefault(EDITOR_SHOW_TEXT_HOVER_AFFORDANCE, true);
 		store.setDefault(EDITOR_HOVER_ENRICH_MODE, 0);
 		store.setDefault(AbstractTextEditor.PREFERENCE_WORD_WRAP_ENABLED, false);
+
+		store.setDefault(EDITOR_STICKY_SCROLLING_ENABLED, false);
+		store.setDefault(EDITOR_STICKY_SCROLLING_MAXIMUM_COUNT, 4);
 
 		MarkerAnnotationPreferences.initializeDefaultValues(store);
 

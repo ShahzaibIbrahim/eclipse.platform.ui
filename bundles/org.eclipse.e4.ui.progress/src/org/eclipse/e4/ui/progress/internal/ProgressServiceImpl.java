@@ -58,7 +58,6 @@ public class ProgressServiceImpl implements IProgressService {
 	ProgressManager progressManager;
 
 	@Inject
-	@Optional
 	FinishedJobs finishedJobs;
 
 	@Inject
@@ -155,7 +154,7 @@ public class ProgressServiceImpl implements IProgressService {
 	public void run(boolean fork, boolean cancelable,
 			IRunnableWithProgress runnable) throws InvocationTargetException,
 			InterruptedException {
-		if (fork == false || cancelable == false) {
+		if (!fork || !cancelable) {
 			// backward compatible code
 			final ProgressMonitorJobsDialog dialog = new ProgressMonitorJobsDialog(
 					null, this, progressManager, contentProviderFactory,

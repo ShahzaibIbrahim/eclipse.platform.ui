@@ -21,6 +21,10 @@ import org.eclipse.swt.events.DisposeListener;
 import org.eclipse.swt.widgets.Shell;
 
 import org.eclipse.core.runtime.Assert;
+import org.eclipse.core.runtime.preferences.IEclipsePreferences;
+import org.eclipse.core.runtime.preferences.IEclipsePreferences.IPreferenceChangeListener;
+import org.eclipse.core.runtime.preferences.IEclipsePreferences.PreferenceChangeEvent;
+import org.eclipse.core.runtime.preferences.InstanceScope;
 
 import org.eclipse.jface.dialogs.IPageChangedListener;
 import org.eclipse.jface.dialogs.PageChangedEvent;
@@ -53,6 +57,39 @@ import org.eclipse.ui.IWorkbenchWindow;
  * @noextend This class is not intended to be subclassed by clients.
  */
 public class FindReplaceAction extends ResourceAction implements IUpdate {
+
+	private static final String INSTANCE_SCOPE_NODE_NAME = "org.eclipse.ui.editors"; //$NON-NLS-1$
+
+	private static final String USE_FIND_REPLACE_OVERLAY = "useFindReplaceOverlay"; //$NON-NLS-1$
+
+	private static final String FIND_REPLACE_OVERLAY_AT_BOTTOM = "findReplaceOverlayAtBottom"; //$NON-NLS-1$
+
+	private boolean shouldUseOverlay() {
+		IEclipsePreferences preferences = InstanceScope.INSTANCE.getNode(INSTANCE_SCOPE_NODE_NAME);
+		boolean overlayPreference = preferences.getBoolean(USE_FIND_REPLACE_OVERLAY, true);
+		return overlayPreference && fWorkbenchPart instanceof StatusTextEditor;
+	}
+
+	private static boolean shouldPositionOverlayOnTop() {
+		IEclipsePreferences preferences = InstanceScope.INSTANCE.getNode(INSTANCE_SCOPE_NODE_NAME);
+		return !preferences.getBoolean(FIND_REPLACE_OVERLAY_AT_BOTTOM, false);
+	}
+
+	private IPreferenceChangeListener overlayDialogPreferenceListener = new IPreferenceChangeListener() {
+
+		@Override
+		public void preferenceChange(PreferenceChangeEvent event) {
+			if (overlay == null) {
+				return;
+			}
+			if (event.getKey().equals(USE_FIND_REPLACE_OVERLAY)) {
+				overlay.close();
+			} else if (event.getKey().equals(FIND_REPLACE_OVERLAY_AT_BOTTOM)) {
+				overlay.setPositionToTop(shouldPositionOverlayOnTop());
+			}
+		}
+
+	};
 
 	/**
 	 * Represents the "global" find/replace dialog. It tracks the active
@@ -219,7 +256,6 @@ public class FindReplaceAction extends ResourceAction implements IUpdate {
 
 	}
 
-
 	/**
 	 * Listener for disabling the dialog on shell close.
 	 * <p>
@@ -245,6 +281,8 @@ public class FindReplaceAction extends ResourceAction implements IUpdate {
 	 * @since 3.3
 	 */
 	private Shell fShell;
+
+	private FindReplaceOverlay overlay;
 
 	/**
 	 * Creates a new find/replace action for the given workbench part.
@@ -314,11 +352,30 @@ public class FindReplaceAction extends ResourceAction implements IUpdate {
 		update();
 	}
 
+	private void hookDialogPreferenceListener() {
+		IEclipsePreferences preferences = InstanceScope.INSTANCE.getNode(INSTANCE_SCOPE_NODE_NAME);
+		preferences.addPreferenceChangeListener(overlayDialogPreferenceListener);
+	}
+
+	private void removeDialogPreferenceListener() {
+		IEclipsePreferences preferences = InstanceScope.INSTANCE.getNode(INSTANCE_SCOPE_NODE_NAME);
+		preferences.removePreferenceChangeListener(overlayDialogPreferenceListener);
+	}
+
 	@Override
 	public void run() {
-		if (fTarget == null)
+		if (fTarget == null) {
 			return;
+		}
 
+		if (shouldUseOverlay()) {
+			showOverlayInEditor();
+		} else {
+			showDialog();
+		}
+	}
+
+	private void showDialog() {
 		final FindReplaceDialog dialog;
 		final boolean isEditable;
 
@@ -350,6 +407,26 @@ public class FindReplaceAction extends ResourceAction implements IUpdate {
 
 		dialog.updateTarget(fTarget, isEditable, true);
 		dialog.open();
+	}
+
+	private void showOverlayInEditor() {
+		if (overlay == null) {
+			Shell shellToUse = null;
+
+			if (fShell == null) {
+				shellToUse = fWorkbenchPart.getSite().getShell();
+			} else {
+				shellToUse = fShell;
+			}
+			overlay = new FindReplaceOverlay(shellToUse, fWorkbenchPart, fTarget);
+			hookDialogPreferenceListener();
+
+			FindReplaceOverlayFirstTimePopup.displayPopupIfNotAlreadyShown(shellToUse);
+		}
+
+		overlay.setPositionToTop(shouldPositionOverlayOnTop());
+		overlay.open();
+		overlay.getShell().addDisposeListener(__ -> removeDialogPreferenceListener());
 	}
 
 	@Override

@@ -78,7 +78,7 @@ public final class Util {
 	 *         <code>false</code>
 	 */
 	public static final int compare(final boolean left, final boolean right) {
-		return left == false ? (right == true ? -1 : 0) : (right == true ? 0 : 1);
+		return !left ? (right ? -1 : 0) : (right ? 0 : 1);
 	}
 
 	/**
@@ -255,14 +255,16 @@ public final class Util {
 
 		String contextId = null;
 		if (method != null) {
-			boolean accessible = method.isAccessible();
-			method.setAccessible(true);
-			try {
-				contextId = (String) method.invoke(command);
-			} catch (Exception e) {
-				// do nothing
+			boolean accessible = method.canAccess(command);
+			if (method.trySetAccessible()) {
+				try {
+					contextId = (String) method.invoke(command);
+				} catch (Exception ignored) {
+					// do nothing
+				} finally {
+					method.setAccessible(accessible);
+				}
 			}
-			method.setAccessible(accessible);
 		}
 		return contextId;
 	}
