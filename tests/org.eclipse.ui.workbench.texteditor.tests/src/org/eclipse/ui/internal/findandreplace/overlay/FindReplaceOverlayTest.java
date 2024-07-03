@@ -11,7 +11,7 @@
  * Contributors:
  *     Vector Informatik GmbH - initial API and implementation
  *******************************************************************************/
-package org.eclipse.ui.workbench.texteditor.tests;
+package org.eclipse.ui.internal.findandreplace.overlay;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -28,6 +28,7 @@ import org.eclipse.text.tests.Accessor;
 import org.eclipse.jface.text.IFindReplaceTarget;
 import org.eclipse.jface.text.TextViewer;
 
+import org.eclipse.ui.internal.findandreplace.FindReplaceUITest;
 import org.eclipse.ui.internal.findandreplace.SearchOptions;
 
 public class FindReplaceOverlayTest extends FindReplaceUITest<OverlayAccess> {
@@ -42,7 +43,7 @@ public class FindReplaceOverlayTest extends FindReplaceUITest<OverlayAccess> {
 				new Object[] { ResourceBundle.getBundle("org.eclipse.ui.texteditor.ConstructedEditorMessages"), "Editor.FindReplace.", viewer.getControl().getShell(),
 						getTextViewer().getFindReplaceTarget() });
 		fFindReplaceAction.invoke("showOverlayInEditor", null);
-		Accessor overlayAccessor= new Accessor(fFindReplaceAction.get("overlay"), "org.eclipse.ui.texteditor.FindReplaceOverlay", getClass().getClassLoader());
+		Accessor overlayAccessor= new Accessor(fFindReplaceAction.get("overlay"), "org.eclipse.ui.internal.findandreplace.overlay.FindReplaceOverlay", getClass().getClassLoader());
 
 		ret= new OverlayAccess(overlayAccessor);
 		return ret;
