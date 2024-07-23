@@ -135,6 +135,7 @@ import org.eclipse.swt.events.ShellAdapter;
 import org.eclipse.swt.events.ShellEvent;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
+import org.eclipse.swt.internal.DPIUtil;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Layout;
@@ -939,7 +940,8 @@ public class WorkbenchWindow implements IWorkbenchWindow {
 			 * apply the changes.
 			 */
 			getShell().addListener(SWT.ZoomChanged, event -> {
-				if (getShell().getDisplay().getPrimaryMonitor().equals(getShell().getMonitor())) {
+				if (getShell().getDisplay().getPrimaryMonitor().equals(getShell().getMonitor())
+						&& !DPIUtil.isAutoScaleOnRuntimeActive()) {
 					int dialogResponse = MessageDialog.open(MessageDialog.QUESTION, getShell(),
 							WorkbenchMessages.Workbench_zoomChangedTitle,
 							WorkbenchMessages.Workbench_zoomChangedMessage, SWT.NONE,
