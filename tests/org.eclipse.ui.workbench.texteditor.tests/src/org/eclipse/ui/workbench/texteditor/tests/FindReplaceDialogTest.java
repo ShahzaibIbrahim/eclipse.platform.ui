@@ -20,14 +20,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 
-import java.util.ResourceBundle;
-
 import org.junit.Test;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Shell;
 
 import org.eclipse.text.tests.Accessor;
 
@@ -39,21 +36,18 @@ import org.eclipse.jface.text.TextViewer;
 import org.eclipse.ui.internal.findandreplace.FindReplaceUITest;
 import org.eclipse.ui.internal.findandreplace.SearchOptions;
 
+import org.eclipse.ui.texteditor.FindReplaceAction;
+
 public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 	@Override
 	public DialogAccess openUIFromTextViewer(TextViewer viewer) {
-		TextViewer textViewer= getTextViewer();
-		Accessor fFindReplaceAction;
+		Accessor findActionAccessor= new Accessor(getFindReplaceAction(), FindReplaceAction.class);
+		findActionAccessor.invoke("showDialog", null);
 
-		fFindReplaceAction= new Accessor("org.eclipse.ui.texteditor.FindReplaceAction", getClass().getClassLoader(),
-				new Class[] { ResourceBundle.class, String.class, Shell.class, IFindReplaceTarget.class },
-				new Object[] { ResourceBundle.getBundle("org.eclipse.ui.texteditor.ConstructedEditorMessages"), "Editor.FindReplace.", textViewer.getControl().getShell(),
-						textViewer.getFindReplaceTarget() });
-		fFindReplaceAction.invoke("run", null);
-
-		Object fFindReplaceDialogStub= fFindReplaceAction.get("fgFindReplaceDialogStub");
-		if (fFindReplaceDialogStub == null)
-			fFindReplaceDialogStub= fFindReplaceAction.get("fgFindReplaceDialogStubShell");
+		Object fFindReplaceDialogStub= findActionAccessor.get("fgFindReplaceDialogStub");
+		if (fFindReplaceDialogStub == null) {
+			fFindReplaceDialogStub= findActionAccessor.get("fgFindReplaceDialogStubShell");
+		}
 		Accessor fFindReplaceDialogStubAccessor= new Accessor(fFindReplaceDialogStub, "org.eclipse.ui.texteditor.FindReplaceAction$FindReplaceDialogStub", getClass().getClassLoader());
 
 		Accessor dialogAccessor= new Accessor(fFindReplaceDialogStubAccessor.invoke("getDialog", null), "org.eclipse.ui.texteditor.FindReplaceDialog", getClass().getClassLoader());
@@ -69,7 +63,7 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 
 		dialog.findCombo.setFocus();
 		dialog.setFindText("line");
-		dialog.simulateEnterInFindInputField(false);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		ensureHasFocusOnGTK();
 
 		assertTrue(dialog.getFindCombo().isFocusControl());
@@ -77,11 +71,11 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 		Button wrapCheckBox= dialog.getButtonForSearchOption(SearchOptions.WRAP);
 		Button globalRadioButton= dialog.getButtonForSearchOption(SearchOptions.GLOBAL);
 		wrapCheckBox.setFocus();
-		dialog.simulateEnterInFindInputField(false);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertTrue(wrapCheckBox.isFocusControl());
 
 		globalRadioButton.setFocus();
-		dialog.simulateEnterInFindInputField(false);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertTrue(globalRadioButton.isFocusControl());
 	}
 
@@ -130,22 +124,22 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 		ensureHasFocusOnGTK();
 		IFindReplaceTarget target= dialog.getTarget();
 
-		dialog.simulateEnterInFindInputField(false);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertEquals(0, (target.getSelection()).x);
 		assertEquals(4, (target.getSelection()).y);
 
-		dialog.simulateEnterInFindInputField(false);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertEquals(5, (target.getSelection()).x);
 		assertEquals(4, (target.getSelection()).y);
 
-		dialog.simulateEnterInFindInputField(true);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, true);
 		assertEquals(0, (target.getSelection()).x);
 		assertEquals(4, (target.getSelection()).y);
 
 		// This part only makes sense for the FindReplaceDialog since not every UI might have stored
 		// the search direction as a state
 		dialog.unselect(SearchOptions.FORWARD);
-		dialog.simulateEnterInFindInputField(true);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, true);
 		assertEquals(5, (target.getSelection()).x);
 	}
 
@@ -217,7 +211,7 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 		dialog.select(SearchOptions.WRAP);
 		IFindReplaceTarget target= dialog.getTarget();
 
-		dialog.simulateEnterInFindInputField(false);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertEquals(0, (target.getSelection()).x);
 		assertEquals(3, (target.getSelection()).y);
 
@@ -225,7 +219,7 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 		dialog.assertDisabled(SearchOptions.WHOLE_WORD);
 		dialog.assertSelected(SearchOptions.WHOLE_WORD);
 
-		dialog.simulateEnterInFindInputField(false);
+		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertThat(target.getSelectionText(), is(dialog.getFindText()));
 
 		assertEquals(0, (target.getSelection()).x);

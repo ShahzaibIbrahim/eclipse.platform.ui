@@ -43,6 +43,7 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.jface.preference.PreferenceStore;
 
+import org.eclipse.jface.text.Document;
 import org.eclipse.jface.text.source.CompositeRuler;
 import org.eclipse.jface.text.source.SourceViewer;
 
@@ -62,6 +63,8 @@ public class StickyScrollingHandlerTest {
 		shell = new Shell(Display.getDefault());
 		ruler = new CompositeRuler();
 		sourceViewer = new SourceViewer(shell, ruler, SWT.None);
+		sourceViewer.setDocument(new Document());
+		sourceViewer.getTextWidget().setBounds(0, 0, 200, 200);
 
 		lineNumberColor = new Color(0, 0, 0);
 		hoverColor = new Color(1, 1, 1);
@@ -172,7 +175,9 @@ public class StickyScrollingHandlerTest {
 	private Canvas getStickyControlCanvas(Composite composite) {
 		for (Control control : composite.getChildren()) {
 			if (control instanceof Canvas canvas) {
-				if (canvas.getChildren().length == 4) {
+				if (canvas.getChildren().length == 3 && canvas.getChildren()[0] instanceof StyledText
+						&& canvas.getChildren()[1] instanceof StyledText
+						&& canvas.getChildren()[2] instanceof Composite) {
 					return canvas;
 				}
 			}

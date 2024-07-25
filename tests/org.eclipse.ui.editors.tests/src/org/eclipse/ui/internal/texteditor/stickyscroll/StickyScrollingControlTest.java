@@ -17,7 +17,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 
 import java.util.List;
 
@@ -52,6 +51,7 @@ public class StickyScrollingControlTest {
 	private Color lineNumberColor;
 	private Color hoverColor;
 	private Color backgroundColor;
+	private Color separatorColor;
 	private StickyScrollingControl stickyScrollingControl;
 	private CompositeRuler ruler;
 
@@ -62,12 +62,15 @@ public class StickyScrollingControlTest {
 		shell.setLayout(new FillLayout());
 		ruler = new CompositeRuler();
 		sourceViewer = new SourceViewer(shell, ruler, SWT.V_SCROLL | SWT.H_SCROLL);
+		sourceViewer.setDocument(new Document());
+		sourceViewer.getTextWidget().setBounds(0, 0, 200, 200);
 
 		lineNumberColor = new Color(0, 0, 0);
 		hoverColor = new Color(1, 1, 1);
 		backgroundColor = new Color(2, 2, 2);
-		StickyScrollingControlSettings settings = new StickyScrollingControlSettings(5, lineNumberColor, hoverColor,
-				backgroundColor, true);
+		separatorColor = new Color(3, 3, 3);
+		StickyScrollingControlSettings settings = new StickyScrollingControlSettings(2, lineNumberColor, hoverColor,
+				backgroundColor, separatorColor, true);
 		stickyScrollingControl = new StickyScrollingControl(sourceViewer, ruler, settings, null);
 	}
 
@@ -104,6 +107,9 @@ public class StickyScrollingControlTest {
 
 		StyledText stickyLineText = getStickyLineText();
 		assertEquals(backgroundColor, stickyLineText.getBackground());
+
+		Composite stickyLineSeparator = getStickyLineSeparator();
+		assertEquals(separatorColor, stickyLineSeparator.getBackground());
 	}
 
 	@Test
@@ -112,22 +118,20 @@ public class StickyScrollingControlTest {
 		stickyScrollingControl.setStickyLines(stickyLines);
 
 		StickyScrollingControlSettings settings = new StickyScrollingControlSettings(1, lineNumberColor, hoverColor,
-				backgroundColor, true);
+				backgroundColor, separatorColor, true);
 		stickyScrollingControl.applySettings(settings);
 
 		StyledText stickyLineNumber = getStickyLineNumber();
-		String expLineNumber = """
-				10""";
+		String expLineNumber = "10";
 		assertEquals(expLineNumber, stickyLineNumber.getText());
 		StyledText stickyLineText = getStickyLineText();
-		String expStickyLineText = """
-				line 10""";
+		String expStickyLineText = "line 10";
 		assertEquals(expStickyLineText, stickyLineText.getText());
 	}
 
 	@Test
 	public void testCopyStyleRanges() {
-		sourceViewer.getTextWidget().setText("line 1");
+		sourceViewer.setInput(new Document("line 1"));
 		sourceViewer.getTextWidget().setStyleRange(new StyleRange(0, 6, lineNumberColor, backgroundColor));
 
 		List<StickyLine> stickyLines = List.of(new StickyLine("line 1", 0));
@@ -139,10 +143,10 @@ public class StickyScrollingControlTest {
 	}
 
 	@Test
-	public void testWithoutVeticalRuler() {
+	public void testWithoutVerticalRuler() {
 		sourceViewer = new SourceViewer(shell, null, SWT.None);
 		StickyScrollingControlSettings settings = new StickyScrollingControlSettings(5, lineNumberColor, hoverColor,
-				backgroundColor, true);
+				backgroundColor, separatorColor, true);
 		stickyScrollingControl = new StickyScrollingControl(sourceViewer, settings);
 
 		StyledText stickyLineNumber = getStickyLineNumber();
@@ -190,7 +194,7 @@ public class StickyScrollingControlTest {
 		assertEquals(0, boundsAfterResize.x);
 		assertEquals(0, boundsAfterResize.y);
 		assertThat(boundsAfterResize.width, greaterThan(0));
-		assertNotEquals(boundsAfterResize.width, boundsBeforeResize.width);
+		assertThat(boundsBeforeResize.width, greaterThan(boundsAfterResize.width));
 		assertEquals(boundsAfterResize.height, boundsBeforeResize.height);
 	}
 
@@ -199,9 +203,8 @@ public class StickyScrollingControlTest {
 		String text = """
 				line 1
 				line 2""";
-		sourceViewer.getTextWidget().setText(text);
+		sourceViewer.setInput(new Document(text));
 		sourceViewer.getTextWidget().setBounds(0, 0, 200, 200);
-		sourceViewer.setDocument(new Document(text));
 
 		List<StickyLine> stickyLines = List.of(new StickyLine("line 2", 1));
 		stickyScrollingControl.setStickyLines(stickyLines);
@@ -216,11 +219,12 @@ public class StickyScrollingControlTest {
 
 	@Test
 	public void testVerticalScrollingIsDispatched() {
+		sourceViewer.getTextWidget().setBounds(0, 0, 200, 0);
 		Canvas stickyControlCanvas = getStickyControlCanvas(shell);
 		String text = """
 				line 1
 				line 2""";
-		sourceViewer.getTextWidget().setText(text);
+		sourceViewer.setInput(new Document(text));
 		sourceViewer.getTextWidget().getVerticalBar().setIncrement(10);
 		assertEquals(0, sourceViewer.getTextWidget().getTopPixel());
 
@@ -233,11 +237,12 @@ public class StickyScrollingControlTest {
 
 	@Test
 	public void testHorizontalScrollingIsDispatched() {
+		sourceViewer.getTextWidget().setBounds(0, 0, 0, 200);
 		Canvas stickyControlCanvas = getStickyControlCanvas(shell);
 		String text = """
 				line 1
 				line 2""";
-		sourceViewer.getTextWidget().setText(text);
+		sourceViewer.setInput(new Document(text));
 		sourceViewer.getTextWidget().getHorizontalBar().setIncrement(10);
 		assertEquals(0, sourceViewer.getTextWidget().getHorizontalPixel());
 
@@ -248,10 +253,97 @@ public class StickyScrollingControlTest {
 		assertEquals(10, sourceViewer.getTextWidget().getHorizontalPixel());
 	}
 
+	@Test
+	public void limitStickyLinesToTextWidgetHeight() {
+		sourceViewer.getTextWidget().setBounds(0, 0, 200, 200);
+		List<StickyLine> stickyLines = List.of(new StickyLine("line 2", 1));
+		stickyScrollingControl.setStickyLines(stickyLines);
+
+		StyledText stickyLineText = getStickyLineText();
+		assertEquals("line 2", stickyLineText.getText());
+
+		sourceViewer.getTextWidget().setBounds(0, 0, 200, 20);
+		stickyLineText = getStickyLineText();
+		assertEquals("", stickyLineText.getText());
+	}
+
+	@Test
+	public void testListenForCarretAfterKeyDown() {
+		// set height to 10 so that scrolling is needed
+		sourceViewer.getTextWidget().setBounds(0, 0, 200, 10);
+		String text = """
+				line 1
+				line 2
+				line 3
+				line 4
+				line 5
+				line 6
+				line 7
+				line 8
+				line 9""";
+		sourceViewer.setInput(new Document(text));
+		assertEquals(0, sourceViewer.getTextWidget().getTopPixel());
+
+		sourceViewer.getTextWidget().notifyListeners(SWT.KeyDown, new Event());
+		sourceViewer.getTextWidget().setCaretOffset(42);
+
+		drainDisplayEventQueue();
+		assertThat(sourceViewer.getTextWidget().getTopPixel(), greaterThan(0));
+	}
+
+	@Test
+	public void testDontListenForCaretWithoutKeyDown() {
+		// set height to 10 so that scrolling is needed
+		sourceViewer.getTextWidget().setBounds(0, 0, 200, 10);
+		String text = """
+				line 1
+				line 2
+				line 3
+				line 4
+				line 5
+				line 6
+				line 7
+				line 8
+				line 9""";
+		sourceViewer.setInput(new Document(text));
+		assertEquals(0, sourceViewer.getTextWidget().getTopPixel());
+
+		sourceViewer.getTextWidget().setCaretOffset(42);
+
+		drainDisplayEventQueue();
+		assertEquals(0, sourceViewer.getTextWidget().getTopPixel());
+	}
+
+	@Test
+	public void testDontMoveCaretAtDocumentEnd() {
+		// set height to 10 so that scrolling is needed
+		sourceViewer.getTextWidget().setBounds(0, 0, 200, 10);
+		String text = """
+				line 1
+				line 2
+				line 3
+				line 4
+				line 5
+				line 6
+				line 7
+				line 8
+				line 9""";
+		sourceViewer.setInput(new Document(text));
+		assertEquals(0, sourceViewer.getTextWidget().getTopPixel());
+
+		sourceViewer.getTextWidget().notifyListeners(SWT.KeyDown, new Event());
+		sourceViewer.getTextWidget().setCaretOffset(62);
+
+		drainDisplayEventQueue();
+		assertEquals(0, sourceViewer.getTextWidget().getTopPixel());
+	}
+
 	private Canvas getStickyControlCanvas(Composite composite) {
 		for (Control control : composite.getChildren()) {
 			if (control instanceof Canvas canvas) {
-				if (canvas.getChildren().length == 4) {
+				if (canvas.getChildren().length == 3 && canvas.getChildren()[0] instanceof StyledText
+						&& canvas.getChildren()[1] instanceof StyledText
+						&& canvas.getChildren()[2] instanceof Composite) {
 					return canvas;
 				}
 			}
@@ -270,6 +362,16 @@ public class StickyScrollingControlTest {
 	private StyledText getStickyLineText() {
 		Canvas canvas = getStickyControlCanvas(shell);
 		return (StyledText) canvas.getChildren()[1];
+	}
+
+	private Composite getStickyLineSeparator() {
+		Canvas canvas = getStickyControlCanvas(shell);
+		return (Composite) canvas.getChildren()[2];
+	}
+
+	private void drainDisplayEventQueue() {
+		while (Display.getDefault().readAndDispatch()) {
+		}
 	}
 
 }

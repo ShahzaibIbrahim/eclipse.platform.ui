@@ -658,6 +658,94 @@ public class FindReplaceLogicTest {
 		assertThat(findReplaceLogic.getTarget().getSelection().y, is(4));
 	}
 
+	@Test
+	public void testResetIncrementalBaseLocation() {
+		String setupString= "test\ntest\ntest";
+		TextViewer textViewer= setupTextViewer(setupString);
+		textViewer.setSelectedRange(0, 0);
+		IFindReplaceLogic findReplaceLogic= setupFindReplaceLogicObject(textViewer);
+		findReplaceLogic.activate(SearchOptions.FORWARD);
+		findReplaceLogic.activate(SearchOptions.WRAP);
+		findReplaceLogic.activate(SearchOptions.INCREMENTAL);
+		findReplaceLogic.performSearch("test");
+		assertThat(textViewer.getSelectedRange(), is(new Point(0, 4)));
+		textViewer.setSelectedRange(5, 0);
+		findReplaceLogic.resetIncrementalBaseLocation();
+		findReplaceLogic.performSearch("test");
+		assertThat(textViewer.getSelectedRange(), is(new Point(5, 4)));
+	}
+
+	@Test
+	public void testPerformIncrementalSearch() {
+		TextViewer textViewer= setupTextViewer("Test Test Test Test");
+		IFindReplaceLogic findReplaceLogic= setupFindReplaceLogicObject(textViewer);
+		findReplaceLogic.activate(SearchOptions.INCREMENTAL);
+		findReplaceLogic.activate(SearchOptions.FORWARD);
+
+		findReplaceLogic.performSearch("Test");
+		assertThat(findReplaceLogic.getTarget().getSelection().x, is(0));
+		assertThat(findReplaceLogic.getTarget().getSelection().y, is(4));
+
+		findReplaceLogic.performSearch("Test"); // incremental search is idempotent
+		assertThat(findReplaceLogic.getTarget().getSelection().x, is(0));
+		assertThat(findReplaceLogic.getTarget().getSelection().y, is(4));
+
+		findReplaceLogic.performSearch(""); // this clears the incremental search, but the "old search" still remains active
+		assertThat(findReplaceLogic.getTarget().getSelection().x, is(0));
+		assertThat(findReplaceLogic.getTarget().getSelection().y, is(4));
+	}
+
+	@Test
+	public void testIncrementBaseLocationWithRegEx() {
+		TextViewer textViewer= setupTextViewer("Test Test Test Test Test");
+		IFindReplaceLogic findReplaceLogic= setupFindReplaceLogicObject(textViewer);
+		findReplaceLogic.activate(SearchOptions.INCREMENTAL);
+		findReplaceLogic.activate(SearchOptions.FORWARD);
+
+		findReplaceLogic.performSearch("Test");
+		assertThat(findReplaceLogic.getTarget().getSelection(), is(new Point(0, 4)));
+
+		findReplaceLogic.activate(SearchOptions.REGEX);
+		findReplaceLogic.deactivate(SearchOptions.INCREMENTAL);
+		findReplaceLogic.performSearch("Test");
+		findReplaceLogic.activate(SearchOptions.INCREMENTAL);
+		assertThat(findReplaceLogic.getTarget().getSelection(), is(new Point(5, 4)));
+		findReplaceLogic.deactivate(SearchOptions.INCREMENTAL);
+		findReplaceLogic.performSearch("Test");
+		findReplaceLogic.activate(SearchOptions.INCREMENTAL);
+		assertThat(findReplaceLogic.getTarget().getSelection(), is(new Point(10, 4)));
+		findReplaceLogic.deactivate(SearchOptions.REGEX);
+
+		findReplaceLogic.performSearch("Test");
+		assertThat(findReplaceLogic.getTarget().getSelection(), is(new Point(10, 4)));
+		findReplaceLogic.performSearch("Test");
+		assertThat(findReplaceLogic.getTarget().getSelection(), is(new Point(10, 4)));
+	}
+
+	@Test
+	public void testIncrementalSearchNoUpdateIfAlreadyOnWord() {
+		TextViewer textViewer= setupTextViewer("hellohello");
+		IFindReplaceLogic findReplaceLogic= setupFindReplaceLogicObject(textViewer);
+		findReplaceLogic.activate(SearchOptions.FORWARD);
+		textViewer.setSelectedRange(0, 4);
+		findReplaceLogic.activate(SearchOptions.INCREMENTAL);
+		textViewer.setSelectedRange(0, 0);
+		findReplaceLogic.performSearch("hello");
+		assertThat(findReplaceLogic.getTarget().getSelection(), is(new Point(0, 5)));
+	}
+
+	@Test
+	public void testIncrementalSearchBackwardNoUpdateIfAlreadyOnWord() {
+		TextViewer textViewer= setupTextViewer("hellohello");
+		IFindReplaceLogic findReplaceLogic= setupFindReplaceLogicObject(textViewer);
+		findReplaceLogic.deactivate(SearchOptions.FORWARD);
+		textViewer.setSelectedRange(5, 5);
+		findReplaceLogic.activate(SearchOptions.INCREMENTAL);
+		textViewer.setSelectedRange(5, 0);
+		findReplaceLogic.performSearch("hello");
+		assertThat(findReplaceLogic.getTarget().getSelection(), is(new Point(5, 5)));
+	}
+
 	private void expectStatusEmpty(IFindReplaceLogic findReplaceLogic) {
 		assertThat(findReplaceLogic.getStatus(), instanceOf(NoStatus.class));
 	}

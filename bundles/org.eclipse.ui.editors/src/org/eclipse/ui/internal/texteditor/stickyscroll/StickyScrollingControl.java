@@ -40,7 +40,6 @@ import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.ScrollBar;
 
@@ -77,6 +76,17 @@ import org.eclipse.ui.internal.texteditor.LineNumberColumn;
  */
 public class StickyScrollingControl {
 
+	/**
+	 * This threshold represents the minimum number of source lines that must remain visible in the
+	 * editor. If the StickyScrollingControl's size would result in fewer than this number of lines
+	 * being visible, the height of the StickyScrollingControl will be reduced to ensure visibility
+	 * of at least this many lines. Thus, it guarantees a minimum visibility threshold for the
+	 * source content in the editor underneath the StickyScrollingControl.
+	 */
+	private final static int MIN_VISIBLE_EDITOR_LINES_THRESHOLD= 3;
+
+	private static final String DISABLE_CSS= "org.eclipse.e4.ui.css.disabled"; //$NON-NLS-1$
+
 	private List<StickyLine> stickyLines;
 
 	private ISourceViewer sourceViewer;
@@ -97,11 +107,11 @@ public class StickyScrollingControl {
 
 	private StickyScollingCaretListener caretListener;
 
-	private Label bottomSeparator;
-
-	private final static int BOTTOM_SEPARATOR_SPACING= 2;
+	private Composite bottomSeparator;
 
 	private StickyScrollingHandler stickyScrollingHandler;
+
+	private int maximumVisibleStickyLines= Integer.MAX_VALUE;
 
 	public StickyScrollingControl(ISourceViewer sourceViewer, StickyScrollingControlSettings settings) {
 		this(sourceViewer, null, settings, null);
@@ -137,6 +147,7 @@ public class StickyScrollingControl {
 
 		stickyLineNumber.setBackground(newSettings.stickyLineBackgroundColor());
 		stickyLineText.setBackground(newSettings.stickyLineBackgroundColor());
+		bottomSeparator.setBackground(settings.stickyLinesSeparatorColor());
 
 		updateStickyScrollingControls();
 	}
@@ -176,14 +187,16 @@ public class StickyScrollingControl {
 		stickyLineText.setEnabled(false);
 		stickyLineText.setBackground(settings.stickyLineBackgroundColor());
 
-		bottomSeparator= new Label(stickyLinesCanvas, SWT.SEPARATOR | SWT.SHADOW_OUT | SWT.HORIZONTAL);
-		GridDataFactory.fillDefaults().grab(true, false).span(2, 1).applyTo(bottomSeparator);
+		bottomSeparator= new Composite(stickyLinesCanvas, SWT.NONE);
+		GridDataFactory.fillDefaults().hint(0, 3).grab(true, false).span(2, 1).applyTo(bottomSeparator);
 		bottomSeparator.setEnabled(false);
+		bottomSeparator.setData(DISABLE_CSS, Boolean.TRUE);
+		bottomSeparator.setBackground(settings.stickyLinesSeparatorColor());
 
-		bottomSeparator= new Label(stickyLinesCanvas, SWT.SEPARATOR | SWT.SHADOW_OUT | SWT.HORIZONTAL);
-		GridDataFactory.fillDefaults().grab(true, false).indent(0, BOTTOM_SEPARATOR_SPACING).span(2, 1).applyTo(bottomSeparator);
-		bottomSeparator.setEnabled(false);
+		layoutLineNumbers();
+		limitVisibleStickyLinesToTextWidgetHeight(sourceViewer.getTextWidget());
 
+		stickyLinesCanvas.pack();
 		stickyLinesCanvas.moveAbove(null);
 	}
 
@@ -209,7 +222,7 @@ public class StickyScrollingControl {
 	}
 
 	private String fillLineNumberWithLeadingSpaces(int lineNumber) {
-		int lineCount= sourceViewer.getTextWidget().getLineCount();
+		int lineCount= sourceViewer.getDocument().getNumberOfLines();
 		int lineNumberLength= String.valueOf(lineCount).length();
 		String formatString= "%" + lineNumberLength + "d"; //$NON-NLS-1$ //$NON-NLS-2$
 		return String.format(formatString, lineNumber);
@@ -268,16 +281,15 @@ public class StickyScrollingControl {
 		layoutLineNumbers();
 
 		stickyLinesCanvas.setVisible(true);
-		stickyLinesCanvas.pack();
 		calculateAndSetStickyLinesCanvasBounds();
 	}
 
 	/**
 	 * The line numbers layout is calculated based on the given {@link #verticalRuler}.
-	 * 
+	 *
 	 * If the vertical ruler is an instance of {@link CompositeRuler}, it is tried to align the
 	 * layout with the layout of the {@link LineNumberColumn}.
-	 * 
+	 *
 	 * If the vertical ruler is from another instance, the lines number are align in the center of
 	 * the vertical ruler space.
 	 */
@@ -335,7 +347,7 @@ public class StickyScrollingControl {
 		int numberStickyLines= getNumberStickyLines();
 		int lineHeight= stickyLineText.getLineHeight() * numberStickyLines;
 		int spacingHeight= stickyLineText.getLineSpacing() * (numberStickyLines - 1);
-		int separatorHeight= bottomSeparator.getBounds().height * 2 + BOTTOM_SEPARATOR_SPACING;
+		int separatorHeight= bottomSeparator.getBounds().height;
 
 		int rulerWidth= verticalRuler != null ? verticalRuler.getWidth() : 0;
 		int textWidth= textWidget.getClientArea().width + 1;
@@ -377,12 +389,14 @@ public class StickyScrollingControl {
 	}
 
 	private int getNumberStickyLines() {
-		return Math.min(settings.maxCountStickyLines(), this.stickyLines.size());
+		int numberStickyLines= Math.min(settings.maxCountStickyLines(), this.stickyLines.size());
+		numberStickyLines= Math.min(maximumVisibleStickyLines, numberStickyLines);
+		return numberStickyLines;
 	}
 
 	/**
 	 * Add several listeners to the source viewer.<br>
-	 * 
+	 *
 	 * textPresentationListener in order to style the sticky lines when the source viewer styling
 	 * has changed.<br>
 	 * <br>
@@ -410,7 +424,12 @@ public class StickyScrollingControl {
 		controlListener= new ControlListener() {
 			@Override
 			public void controlResized(ControlEvent e) {
+				StyledText textWidget= sourceViewer.getTextWidget();
+				limitVisibleStickyLinesToTextWidgetHeight(textWidget);
 				layoutStickyLines();
+				if (stickyScrollingHandler != null) {
+					stickyScrollingHandler.viewportChanged(textWidget.getTopPixel());
+				}
 			}
 
 			@Override
@@ -419,6 +438,16 @@ public class StickyScrollingControl {
 			}
 		};
 		sourceViewer.getTextWidget().addControlListener(controlListener);
+	}
+
+	private void limitVisibleStickyLinesToTextWidgetHeight(StyledText textWidget) {
+		int lineHeight= textWidget.getLineHeight() + textWidget.getLineSpacing();
+		int textWidgetHeight= textWidget.getBounds().height;
+
+		int visibleLinesInTextWidget= textWidgetHeight / lineHeight;
+
+		maximumVisibleStickyLines= Math.max(0, visibleLinesInTextWidget - MIN_VISIBLE_EDITOR_LINES_THRESHOLD);
+		updateStickyScrollingControls();
 	}
 
 	/**
@@ -478,7 +507,8 @@ public class StickyScrollingControl {
 
 		@Override
 		public void caretMoved(CaretEvent event) {
-			if (event.caretOffset == 0) {
+			int offsetEndPosition = sourceViewer.getTextWidget().getText().length();
+			if (event.caretOffset == 0 || event.caretOffset == offsetEndPosition) {
 				return;
 			}
 			Display.getDefault().asyncExec(() -> {

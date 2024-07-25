@@ -67,7 +67,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 		case FORWARD:
 		case INCREMENTAL:
 			if (shouldInitIncrementalBaseLocation()) {
-				initIncrementalBaseLocation();
+				resetIncrementalBaseLocation();
 			}
 			break;
 		// $CASES-OMITTED$
@@ -87,7 +87,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 		}
 
 		if (searchOption == SearchOptions.FORWARD && shouldInitIncrementalBaseLocation()) {
-			initIncrementalBaseLocation();
+			resetIncrementalBaseLocation();
 		}
 	}
 
@@ -136,13 +136,9 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 		return isActive(SearchOptions.REGEX) && isTargetSupportingRegEx;
 	}
 
-
-	/**
-	 * Initializes the anchor used as starting point for incremental searching.
-	 *
-	 */
-	private void initIncrementalBaseLocation() {
-		if (target != null && isActive(SearchOptions.INCREMENTAL) && !isRegExSearchAvailableAndActive()) {
+	@Override
+	public void resetIncrementalBaseLocation() {
+		if (target != null && shouldInitIncrementalBaseLocation()) {
 			incrementalBaseLocation = target.getSelection();
 		} else {
 			incrementalBaseLocation = new Point(0, 0);
@@ -150,7 +146,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	}
 
 	public boolean shouldInitIncrementalBaseLocation() {
-		return isActive(SearchOptions.INCREMENTAL) && !isActive(SearchOptions.REGEX);
+		return isActive(SearchOptions.INCREMENTAL);
 	}
 
 	/**
@@ -159,7 +155,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	 */
 	private void initializeSearchScope() {
 		if (shouldInitIncrementalBaseLocation()) {
-			initIncrementalBaseLocation();
+			resetIncrementalBaseLocation();
 		}
 
 		if (target == null || !(target instanceof IFindReplaceTargetExtension)) {
@@ -329,24 +325,12 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	}
 
 	@Override
-	public boolean performSearch(String searchString) {
-		return performSearch(shouldInitIncrementalBaseLocation(), searchString);
-	}
-
-	/**
-	 * Locates the user's findString in the text of the target.
-	 *
-	 * @param mustInitIncrementalBaseLocation <code>true</code> if base location
-	 *                                        must be initialized
-	 * @param findString                      the String to search for
-	 * @return Whether the string was found in the target
-	 */
-	private boolean performSearch(boolean mustInitIncrementalBaseLocation, String findString) {
-		if (mustInitIncrementalBaseLocation) {
-			initIncrementalBaseLocation();
-		}
+	public boolean performSearch(String findString) {
 		resetStatus();
 
+		if (isActive(SearchOptions.INCREMENTAL) && !isIncrementalSearchAvailable()) {
+			return false; // Do nothing if search options are not compatible
+		}
 		boolean somethingFound = false;
 
 		if (findString != null && !findString.isEmpty()) {
@@ -520,17 +504,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 			return false;
 		}
 
-		Point r = null;
-		if (isActive(SearchOptions.INCREMENTAL)) {
-			r = incrementalBaseLocation;
-		} else {
-			r = target.getSelection();
-		}
-
-		int findReplacePosition = r.x;
-		if (isActive(SearchOptions.FORWARD)) {
-			findReplacePosition += r.y;
-		}
+		int findReplacePosition = calculateFindBeginningOffset();
 
 		int index = findIndex(findString, findReplacePosition);
 
@@ -547,6 +521,22 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 		}
 
 		return true;
+	}
+
+	private int calculateFindBeginningOffset() {
+		Point r = null;
+		if (isActive(SearchOptions.INCREMENTAL)) {
+			r = incrementalBaseLocation;
+		} else {
+			r = target.getSelection();
+		}
+
+		int findReplacePosition = r.x;
+		if (isActive(SearchOptions.FORWARD) && !isActive(SearchOptions.INCREMENTAL)
+				|| isActive(SearchOptions.INCREMENTAL) && !isActive(SearchOptions.FORWARD)) {
+			findReplacePosition += r.y;
+		}
+		return findReplacePosition;
 	}
 
 	@Override
@@ -604,7 +594,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 			}
 		}
 
-		initIncrementalBaseLocation();
+		resetIncrementalBaseLocation();
 	}
 
 	@Override
@@ -654,26 +644,6 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	 */
 	private void statusLineMessage(String message) {
 		statusLineMessage(false, message);
-	}
-
-	@Override
-	public void performIncrementalSearch(String searchString) {
-		resetStatus();
-
-		if (isActive(SearchOptions.INCREMENTAL) && isIncrementalSearchAvailable()) {
-			if (searchString.equals("") && target != null) { //$NON-NLS-1$
-				// empty selection at base location
-				int offset = incrementalBaseLocation.x;
-
-				if (isActive(SearchOptions.FORWARD)) {
-					offset = offset + incrementalBaseLocation.y;
-				}
-
-				findAndSelect(offset, ""); //$NON-NLS-1$
-			} else {
-				performSearch(false, searchString);
-			}
-		}
 	}
 
 	@Override

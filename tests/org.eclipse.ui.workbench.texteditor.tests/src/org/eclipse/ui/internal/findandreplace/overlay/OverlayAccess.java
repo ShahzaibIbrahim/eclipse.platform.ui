@@ -13,6 +13,7 @@
  *******************************************************************************/
 package org.eclipse.ui.internal.findandreplace.overlay;
 
+import static org.eclipse.ui.internal.findandreplace.FindReplaceTestUtil.runEventQueue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -27,7 +28,6 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.ToolItem;
 
 import org.eclipse.text.tests.Accessor;
@@ -36,7 +36,6 @@ import org.eclipse.jface.text.IFindReplaceTarget;
 import org.eclipse.jface.text.IFindReplaceTargetExtension;
 
 import org.eclipse.ui.internal.findandreplace.FindReplaceLogic;
-import org.eclipse.ui.internal.findandreplace.FindReplaceTestUtil;
 import org.eclipse.ui.internal.findandreplace.IFindReplaceLogic;
 import org.eclipse.ui.internal.findandreplace.IFindReplaceUIAccess;
 import org.eclipse.ui.internal.findandreplace.SearchOptions;
@@ -44,9 +43,9 @@ import org.eclipse.ui.internal.findandreplace.SearchOptions;
 class OverlayAccess implements IFindReplaceUIAccess {
 	FindReplaceLogic findReplaceLogic;
 
-	Text find;
+	HistoryTextWrapper find;
 
-	Text replace;
+	HistoryTextWrapper replace;
 
 	ToolItem inSelection;
 
@@ -75,8 +74,8 @@ class OverlayAccess implements IFindReplaceUIAccess {
 	OverlayAccess(Accessor findReplaceOverlayAccessor) {
 		dialogAccessor= findReplaceOverlayAccessor;
 		findReplaceLogic= (FindReplaceLogic) findReplaceOverlayAccessor.get("findReplaceLogic");
-		find= (Text) findReplaceOverlayAccessor.get("searchBar");
-		replace= (Text) findReplaceOverlayAccessor.get("replaceBar");
+		find= (HistoryTextWrapper) findReplaceOverlayAccessor.get("searchBar");
+		replace= (HistoryTextWrapper) findReplaceOverlayAccessor.get("replaceBar");
 		caseSensitive= (ToolItem) findReplaceOverlayAccessor.get("caseSensitiveSearchButton");
 		wholeWord= (ToolItem) findReplaceOverlayAccessor.get("wholeWordSearchButton");
 		regEx= (ToolItem) findReplaceOverlayAccessor.get("regexSearchButton");
@@ -142,26 +141,25 @@ class OverlayAccess implements IFindReplaceUIAccess {
 	}
 
 	@Override
-	public void simulateEnterInFindInputField(boolean shiftPressed) {
-		simulateKeyPressInFindInputField(SWT.CR, shiftPressed);
-	}
-
-	@Override
-	public void simulateKeyPressInFindInputField(int keyCode, boolean shiftPressed) {
+	public void simulateKeyboardInteractionInFindInputField(int keyCode, boolean shiftPressed) {
 		final Event event= new Event();
 		event.type= SWT.KeyDown;
-		event.keyCode= keyCode;
 		if (shiftPressed) {
 			event.stateMask= SWT.SHIFT;
 		}
+		event.keyCode= keyCode;
 		find.notifyListeners(SWT.KeyDown, event);
-		find.traverse(SWT.TRAVERSE_RETURN, event);
-		FindReplaceTestUtil.runEventQueue();
+		runEventQueue();
 	}
 
 	@Override
 	public String getFindText() {
 		return find.getText();
+	}
+
+	@Override
+	public String getSelectedFindText() {
+		return find.getSelectionText();
 	}
 
 	@Override
@@ -253,7 +251,7 @@ class OverlayAccess implements IFindReplaceUIAccess {
 	public void openReplaceDialog() {
 		if (!isReplaceDialogOpen() && Objects.nonNull(openReplaceDialog)) {
 			openReplaceDialog.notifyListeners(SWT.Selection, null);
-			replace= (Text) dialogAccessor.get("replaceBar");
+			replace= (HistoryTextWrapper) dialogAccessor.get("replaceBar");
 			replaceButton= (ToolItem) dialogAccessor.get("replaceButton");
 			replaceAllButton= (ToolItem) dialogAccessor.get("replaceAllButton");
 		}

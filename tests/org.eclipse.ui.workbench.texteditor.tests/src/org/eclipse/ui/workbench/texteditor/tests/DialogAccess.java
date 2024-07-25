@@ -23,6 +23,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Event;
@@ -169,23 +170,17 @@ class DialogAccess implements IFindReplaceUIAccess {
 	}
 
 	@Override
-	public void simulateEnterInFindInputField(boolean shiftPressed) {
-		simulateKeyPressInFindInputField(SWT.CR, shiftPressed);
-	}
-
-	@Override
-	public void simulateKeyPressInFindInputField(int keyCode, boolean shiftPressed) {
+	public void simulateKeyboardInteractionInFindInputField(int keyCode, boolean shiftPressed) {
 		final Event event= new Event();
-		event.type= SWT.Traverse;
 		event.detail= SWT.TRAVERSE_RETURN;
-		event.character= (char) keyCode;
+		event.type= SWT.KeyDown;
 		if (shiftPressed) {
 			event.stateMask= SWT.SHIFT;
 		}
+		event.keyCode= keyCode;
 		findCombo.traverse(SWT.TRAVERSE_RETURN, event);
 		runEventQueue();
 	}
-
 
 	@Override
 	public String getReplaceText() {
@@ -211,6 +206,12 @@ class DialogAccess implements IFindReplaceUIAccess {
 	@Override
 	public String getFindText() {
 		return findCombo.getText();
+	}
+
+	@Override
+	public String getSelectedFindText() {
+		Point selection = findCombo.getSelection();
+		return findCombo.getText().substring(selection.x, selection.y);
 	}
 
 	public Combo getFindCombo() {
