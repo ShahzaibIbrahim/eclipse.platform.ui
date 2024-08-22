@@ -302,6 +302,14 @@ public class WindowsDefenderConfigurator implements EventHandler {
 			List<String> result = runPowershell(monitor, "-Command", "(Get-Service 'WinDefend').Status"); //$NON-NLS-1$ //$NON-NLS-2$
 			return result.size() == 1 && "Running".equalsIgnoreCase(result.get(0)); //$NON-NLS-1$
 		} catch (IOException e) {
+			String message = e.getMessage();
+			if (message != null
+					&& message.startsWith("Cannot run program \"" + POWERSHELL_EXE + "\": CreateProcess error=5")) { //$NON-NLS-1$//$NON-NLS-2$
+				// error code 5 means ERROR_ACCESS_DENIED:
+				// https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
+				// Without permission to launch powershell we can't do anything and stay silent
+				return false;
+			}
 			ILog.get().error("Failed to obtain 'WinDefend' service state", e); //$NON-NLS-1$
 			return false;
 		}
@@ -311,11 +319,11 @@ public class WindowsDefenderConfigurator implements EventHandler {
 		// https://learn.microsoft.com/en-us/powershell/module/defender/get-mpcomputerstatus?view=windowsserver2019-ps
 		try {
 			List<String> lines = runPowershell(monitor, "-Command", "(Get-MpComputerStatus).AMRunningMode"); //$NON-NLS-1$ //$NON-NLS-2$
-			String onlyLine = lines.size() == 1 ? lines.get(0) : ""; //$NON-NLS-1$
-			return switch (onlyLine.toLowerCase(Locale.ENGLISH)) {
+			String onlyLine = lines.size() == 1 ? lines.get(0) : "error"; //$NON-NLS-1$
+			return switch (onlyLine.toLowerCase(Locale.ENGLISH).strip()) {
 			// Known values as listed in
 			// https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/microsoft-defender-antivirus-windows#use-powershell-to-check-the-status-of-microsoft-defender-antivirus
-			case "sxs passive mode", "passive mode" -> false; //$NON-NLS-1$ //$NON-NLS-2$
+			case "sxs passive mode", "passive mode", "" -> false; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 			case "normal", "edr block mode" -> true; //$NON-NLS-1$//$NON-NLS-2$
 			default -> throw new IOException("Process terminated with unexpected result:\n" + String.join("\n", lines)); //$NON-NLS-1$//$NON-NLS-2$
 			};
@@ -364,8 +372,10 @@ public class WindowsDefenderConfigurator implements EventHandler {
 				"-ArgumentList", "'-EncodedCommand " + encodedCommand + "'"); //$NON-NLS-1$//$NON-NLS-2$//$NON-NLS-3$
 	}
 
+	private static final String POWERSHELL_EXE = "powershell.exe"; //$NON-NLS-1$
+
 	private static List<String> runPowershell(IProgressMonitor monitor, String... arguments) throws IOException {
-		return runProcess(Stream.concat(Stream.of("powershell.exe"), Arrays.stream(arguments)).toList(), monitor); //$NON-NLS-1$
+		return runProcess(Stream.concat(Stream.of(POWERSHELL_EXE), Arrays.stream(arguments)).toList(), monitor);
 	}
 
 	private static List<String> runProcess(List<String> command, IProgressMonitor monitor) throws IOException {

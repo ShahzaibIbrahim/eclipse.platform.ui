@@ -128,7 +128,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	 * @return <code>true</code> if the given string is a word
 	 */
 	private static boolean isWord(String str) {
-		return str != null && !str.isEmpty() && str.chars().allMatch(Character::isJavaIdentifierPart);
+		return str != null && str.chars().allMatch(Character::isJavaIdentifierPart);
 	}
 
 	@Override
@@ -326,9 +326,13 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 
 	@Override
 	public boolean performSearch(String findString) {
+		return performSearch(findString, true);
+	}
+
+	private boolean performSearch(String findString, boolean validateSearchOptions) {
 		resetStatus();
 
-		if (isActive(SearchOptions.INCREMENTAL) && !isIncrementalSearchAvailable()) {
+		if (validateSearchOptions && (isActive(SearchOptions.INCREMENTAL) && !isIncrementalSearchAvailable())) {
 			return false; // Do nothing if search options are not compatible
 		}
 		boolean somethingFound = false;
@@ -543,7 +547,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	public boolean performReplaceAndFind(String findString, String replaceString) {
 		resetStatus();
 		if (performSelectAndReplace(findString, replaceString)) {
-			performSearch(findString);
+			performSearch(findString, false);
 			return true;
 		}
 		return false;
@@ -553,7 +557,7 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	public boolean performSelectAndReplace(String findString, String replaceString) {
 		resetStatus();
 		if (!isFindStringSelected(findString)) {
-			performSearch(findString);
+			performSearch(findString, false);
 		}
 		if (getStatus().wasSuccessful()) {
 			return replaceSelection(replaceString);

@@ -42,6 +42,7 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.ScrollBar;
 import org.eclipse.swt.widgets.Scrollable;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
@@ -62,7 +63,6 @@ import org.eclipse.jface.window.Window;
 import org.eclipse.jface.text.FindReplaceDocumentAdapter;
 import org.eclipse.jface.text.FindReplaceDocumentAdapterContentProposalProvider;
 import org.eclipse.jface.text.IFindReplaceTarget;
-import org.eclipse.jface.text.IFindReplaceTargetExtension;
 import org.eclipse.jface.text.ITextViewer;
 
 import org.eclipse.ui.IPartListener2;
@@ -195,18 +195,23 @@ public class FindReplaceOverlay extends Dialog {
 	private ControlListener shellMovementListener = new ControlListener() {
 		@Override
 		public void controlMoved(ControlEvent e) {
-			if (getShell() != null) {
-				getShell().getDisplay().asyncExec(() -> updatePlacementAndVisibility());
-			}
+			asyncUpdatePlacementAndVisibility();
 		}
 
 		@Override
 		public void controlResized(ControlEvent e) {
-			if (getShell() != null) {
-				getShell().getDisplay().asyncExec(() -> updatePlacementAndVisibility());
-			}
+			asyncUpdatePlacementAndVisibility();
 		}
 	};
+
+	private PaintListener widgetMovementListener = __ -> asyncUpdatePlacementAndVisibility();
+
+	private void asyncUpdatePlacementAndVisibility() {
+		Shell shell = getShell();
+		if (shell != null) {
+			shell.getDisplay().asyncExec(this::updatePlacementAndVisibility);
+		}
+	}
 
 	private ShellAdapter overlayDeactivationListener = new ShellAdapter() {
 		@Override
@@ -219,8 +224,6 @@ public class FindReplaceOverlay extends Dialog {
 			removeSearchScope();
 		}
 	};
-
-	private PaintListener widgetMovementListener = __ -> updatePlacementAndVisibility();
 
 	private static class TargetPartVisibilityHandler implements IPartListener2, IPageChangedListener {
 		private final IWorkbenchPart targetPart;
@@ -547,7 +550,7 @@ public class FindReplaceOverlay extends Dialog {
 				.withToolTipText(FindReplaceMessages.FindReplaceOverlay_regexSearchButton_toolTip)
 				.withOperation(() -> {
 					activateInFindReplacerIf(SearchOptions.REGEX, regexSearchButton.getSelection());
-					wholeWordSearchButton.setEnabled(!findReplaceLogic.isActive(SearchOptions.REGEX));
+					wholeWordSearchButton.setEnabled(findReplaceLogic.isWholeWordSearchAvailable(getFindString()));
 					updateIncrementalSearch();
 					updateContentAssistAvailability();
 				}).withShortcuts(KeyboardShortcuts.OPTION_REGEX).build();
@@ -626,10 +629,7 @@ public class FindReplaceOverlay extends Dialog {
 			wholeWordSearchButton.setEnabled(findReplaceLogic.isWholeWordSearchAvailable(getFindString()));
 
 			showUserFeedback(normalTextForegroundColor, true);
-			// don't perform incremental search if we are already on the word.
-			if (!getFindString().equals(findReplaceLogic.getTarget().getSelectionText())) {
-				updateIncrementalSearch();
-			}
+			updateIncrementalSearch();
 		});
 		searchBar.addFocusListener(new FocusListener() {
 
@@ -649,11 +649,6 @@ public class FindReplaceOverlay extends Dialog {
 	}
 
 	private void updateIncrementalSearch() {
-		// clear the current incrementally searched selection to avoid having an old
-		// selection left when incrementally searching for an invalid string
-		if (findReplaceLogic.getTarget() instanceof IFindReplaceTargetExtension targetExtension) {
-			targetExtension.setSelection(targetExtension.getLineSelection().x, 0);
-		}
 		findReplaceLogic.performSearch(getFindString());
 		evaluateFindReplaceStatus();
 	}
@@ -896,8 +891,14 @@ public class FindReplaceOverlay extends Dialog {
 		int width = localControlBounds.width;
 		int height = localControlBounds.height;
 		if (control instanceof Scrollable scrollable) {
-			width -= scrollable.getVerticalBar().getSize().x;
-			height -= scrollable.getHorizontalBar().getSize().y;
+			ScrollBar verticalBar = scrollable.getVerticalBar();
+			ScrollBar horizontalBar = scrollable.getHorizontalBar();
+			if (verticalBar != null) {
+				width -= verticalBar.getSize().x;
+			}
+			if (horizontalBar != null) {
+				height -= horizontalBar.getSize().y;
+			}
 		}
 		if (control instanceof StyledText styledText) {
 			width -= styledText.getRightMargin();
@@ -926,11 +927,16 @@ public class FindReplaceOverlay extends Dialog {
 	}
 
 	private void updateVisibility(Rectangle targetControlBounds, Rectangle overlayBounds) {
+		boolean shallBeVisible = true;
 		if (positionAtTop) {
-			getShell().setVisible(
-					overlayBounds.y + overlayBounds.height <= targetControlBounds.y + targetControlBounds.height);
+			shallBeVisible = overlayBounds.y + overlayBounds.height <= targetControlBounds.y
+					+ targetControlBounds.height;
 		} else {
-			getShell().setVisible(overlayBounds.y >= targetControlBounds.y);
+			shallBeVisible = overlayBounds.y >= targetControlBounds.y;
+		}
+		Shell shell = getShell();
+		if (shallBeVisible != shell.isVisible()) {
+			shell.setVisible(shallBeVisible);
 		}
 	}
 
@@ -1012,6 +1018,9 @@ public class FindReplaceOverlay extends Dialog {
 
 	public void setPositionToTop(boolean shouldPositionOverlayOnTop) {
 		positionAtTop = shouldPositionOverlayOnTop;
+		if (overlayOpen) {
+			updatePlacementAndVisibility();
+		}
 	}
 
 	private void removeSearchScope() {

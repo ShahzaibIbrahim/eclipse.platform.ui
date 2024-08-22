@@ -69,7 +69,7 @@ public class HistoryTextWrapper extends Composite {
 	private void listenForKeyboardHistoryNavigation() {
 		addKeyListener(KeyListener.keyPressedAdapter(e -> {
 			if (e.keyCode == SWT.ARROW_UP || e.keyCode == SWT.ARROW_DOWN) {
-				int stepDirection = e.keyCode == SWT.ARROW_UP ? 1 : -1;
+				int stepDirection = e.keyCode == SWT.ARROW_UP ? -1 : 1;
 				navigateInHistory(stepDirection);
 			}
 		}));
@@ -99,7 +99,9 @@ public class HistoryTextWrapper extends Composite {
 	}
 
 	private void enableDropDown() {
-		dropDown.setEnabled(true);
+		if (!dropDown.isDisposed()) {
+			dropDown.setEnabled(true);
+		}
 	}
 
 	private void navigateInHistory(int navigationOffset) {
