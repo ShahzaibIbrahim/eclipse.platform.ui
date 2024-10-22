@@ -49,6 +49,7 @@ import org.eclipse.jface.action.LegacyActionTools;
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.dialogs.IDialogSettings;
 import org.eclipse.jface.fieldassist.ComboContentAdapter;
+import org.eclipse.jface.fieldassist.ControlDecoration;
 import org.eclipse.jface.fieldassist.FieldDecoration;
 import org.eclipse.jface.fieldassist.FieldDecorationRegistry;
 import org.eclipse.jface.resource.JFaceColors;
@@ -64,6 +65,7 @@ import org.eclipse.jface.text.TextUtilities;
 
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.fieldassist.ContentAssistCommandAdapter;
+import org.eclipse.ui.internal.SearchDecoration;
 import org.eclipse.ui.internal.findandreplace.FindReplaceLogic;
 import org.eclipse.ui.internal.findandreplace.FindReplaceLogicMessageGenerator;
 import org.eclipse.ui.internal.findandreplace.FindReplaceMessages;
@@ -71,6 +73,7 @@ import org.eclipse.ui.internal.findandreplace.HistoryStore;
 import org.eclipse.ui.internal.findandreplace.IFindReplaceLogic;
 import org.eclipse.ui.internal.findandreplace.SearchOptions;
 import org.eclipse.ui.internal.findandreplace.status.IFindReplaceStatus;
+import org.eclipse.ui.internal.findandreplace.status.InvalidRegExStatus;
 import org.eclipse.ui.internal.texteditor.SWTUtil;
 
 /**
@@ -78,6 +81,8 @@ import org.eclipse.ui.internal.texteditor.SWTUtil;
  * re-targeted. Internally used by the <code>FindReplaceAction</code>
  */
 class FindReplaceDialog extends Dialog {
+
+	public static final String ID_DATA_KEY = "org.eclipse.ui.texteditor.FindReplaceDialog.id"; //$NON-NLS-1$
 
 	private static final int CLOSE_BUTTON_ID = 101;
 	private IFindReplaceLogic findReplaceLogic;
@@ -117,17 +122,21 @@ class FindReplaceDialog extends Dialog {
 
 	}
 
-	private final FindModifyListener fFindModifyListener = new FindModifyListener();
-
 	/**
-	 * Modify listener to update the search result in case of incremental search.
+	 * Modify listener to update the find logic with the current input.
 	 *
 	 * @since 2.0
 	 */
-	private class FindModifyListener implements ModifyListener {
+	private class InputModifyListener implements ModifyListener {
+
+		private Runnable modificationHandler;
 
 		// XXX: Workaround for Combo bug on Linux (see bug 404202 and bug 410603)
 		private boolean fIgnoreNextEvent;
+
+		private InputModifyListener(Runnable modificationHandler) {
+			this.modificationHandler = modificationHandler;
+		}
 
 		private void ignoreNextEvent() {
 			fIgnoreNextEvent = true;
@@ -135,17 +144,16 @@ class FindReplaceDialog extends Dialog {
 
 		@Override
 		public void modifyText(ModifyEvent e) {
-
+			modificationHandler.run();
 			// XXX: Workaround for Combo bug on Linux (see bug 404202 and bug 410603)
 			if (fIgnoreNextEvent) {
 				fIgnoreNextEvent = false;
 				return;
 			}
-
-			if (findReplaceLogic.isActive(SearchOptions.INCREMENTAL)) {
-				findReplaceLogic.performSearch(getFindString());
-			}
-			evaluateFindReplaceStatus();
+			modificationHandler.run();
+			fFindField.addModifyListener(event -> {
+				decorate();
+			});
 
 			updateButtonState(!findReplaceLogic.isActive(SearchOptions.INCREMENTAL));
 		}
@@ -175,6 +183,8 @@ class FindReplaceDialog extends Dialog {
 
 	private Button fReplaceSelectionButton, fReplaceFindButton, fFindNextButton, fReplaceAllButton, fSelectAllButton;
 	private Combo fFindField, fReplaceField;
+	private InputModifyListener fFindModifyListener, fReplaceModifyListener;
+	private boolean regexOk = true;
 
 	/**
 	 * Find and replace command adapters.
@@ -193,6 +203,7 @@ class FindReplaceDialog extends Dialog {
 	 * @since 3.0
 	 */
 	private boolean fGiveFocusToFindField = true;
+	private ControlDecoration fFindFieldDecoration;
 
 	/**
 	 * Holds the mnemonic/button pairs for all buttons.
@@ -260,7 +271,9 @@ class FindReplaceDialog extends Dialog {
 		fFindField.removeModifyListener(fFindModifyListener);
 		updateCombo(fFindField, findHistory.get());
 		fFindField.addModifyListener(fFindModifyListener);
+		fReplaceField.removeModifyListener(fReplaceModifyListener);
 		updateCombo(fReplaceField, replaceHistory.get());
+		fReplaceField.addModifyListener(fReplaceModifyListener);
 
 		// get find string
 		initFindString();
@@ -272,6 +285,7 @@ class FindReplaceDialog extends Dialog {
 		shell.setText(FindReplaceMessages.FindReplace_Dialog_Title);
 
 		updateButtonState();
+		assignIDs();
 	}
 
 	/**
@@ -298,12 +312,13 @@ class FindReplaceDialog extends Dialog {
 						activateInFindReplaceLogicIf(SearchOptions.FORWARD,
 								eventRequiresInverseSearchDirection != forwardSearchActivated);
 						findReplaceLogic.deactivate(SearchOptions.INCREMENTAL);
-						boolean somethingFound = findReplaceLogic.performSearch(getFindString());
+						boolean somethingFound = findReplaceLogic.performSearch();
 						activateInFindReplaceLogicIf(SearchOptions.INCREMENTAL, incrementalSearchActivated);
 						activateInFindReplaceLogicIf(SearchOptions.FORWARD, forwardSearchActivated);
 
 						writeSelection();
 						updateButtonState(!somethingFound);
+						
 						updateFindHistory();
 						evaluateFindReplaceStatus();
 					}
@@ -315,7 +330,7 @@ class FindReplaceDialog extends Dialog {
 					@Override
 					public void widgetSelected(SelectionEvent e) {
 						BusyIndicator.showWhile(fActiveShell != null ? fActiveShell.getDisplay() : Display.getCurrent(),
-								() -> findReplaceLogic.performSelectAll(getFindString()));
+								findReplaceLogic::performSelectAll);
 						writeSelection();
 						updateButtonState();
 						updateFindAndReplaceHistory();
@@ -331,7 +346,7 @@ class FindReplaceDialog extends Dialog {
 				new SelectionAdapter() {
 					@Override
 					public void widgetSelected(SelectionEvent e) {
-						if (findReplaceLogic.performReplaceAndFind(getFindString(), getReplaceString())) {
+						if (findReplaceLogic.performReplaceAndFind()) {
 							writeSelection();
 						}
 						updateButtonState();
@@ -339,13 +354,14 @@ class FindReplaceDialog extends Dialog {
 						evaluateFindReplaceStatus();
 					}
 				});
+
 		setGridData(fReplaceFindButton, SWT.FILL, false, SWT.FILL, false);
 
 		fReplaceSelectionButton = makeButton(panel, FindReplaceMessages.FindReplace_ReplaceSelectionButton_label, 104,
 				false, new SelectionAdapter() {
 					@Override
 					public void widgetSelected(SelectionEvent e) {
-						if (findReplaceLogic.performSelectAndReplace(getFindString(), getReplaceString())) {
+						if (findReplaceLogic.performSelectAndReplace()) {
 							writeSelection();
 						}
 						updateButtonState();
@@ -360,7 +376,7 @@ class FindReplaceDialog extends Dialog {
 					@Override
 					public void widgetSelected(SelectionEvent e) {
 						BusyIndicator.showWhile(fActiveShell != null ? fActiveShell.getDisplay() : Display.getCurrent(),
-								() -> findReplaceLogic.performReplaceAll(getFindString(), getReplaceString()));
+								() -> findReplaceLogic.performReplaceAll());
 						writeSelection();
 						updateButtonState();
 						updateFindAndReplaceHistory();
@@ -628,10 +644,17 @@ class FindReplaceDialog extends Dialog {
 		FindReplaceDocumentAdapterContentProposalProvider findProposer = new FindReplaceDocumentAdapterContentProposalProvider(
 				true);
 		fFindField = new Combo(panel, SWT.DROP_DOWN | SWT.BORDER);
+		fFindFieldDecoration = new ControlDecoration(fFindField, SWT.BOTTOM | SWT.LEFT);
+
 		fContentAssistFindField = new ContentAssistCommandAdapter(fFindField, contentAdapter, findProposer,
 				ITextEditorActionDefinitionIds.CONTENT_ASSIST_PROPOSALS, new char[0], true);
 		setGridData(fFindField, SWT.FILL, true, SWT.CENTER, false);
 		addDecorationMargin(fFindField);
+		fFindModifyListener = new InputModifyListener(() -> {
+			if (okToUse(fFindField)) {
+				findReplaceLogic.setFindString(fFindField.getText());
+			}
+		});
 		fFindField.addModifyListener(fFindModifyListener);
 
 		fReplaceLabel = new Label(panel, SWT.LEFT);
@@ -646,6 +669,12 @@ class FindReplaceDialog extends Dialog {
 				ITextEditorActionDefinitionIds.CONTENT_ASSIST_PROPOSALS, new char[0], true);
 		setGridData(fReplaceField, SWT.FILL, true, SWT.CENTER, false);
 		addDecorationMargin(fReplaceField);
+		fReplaceModifyListener = new InputModifyListener(() -> {
+			if (okToUse(fReplaceField)) {
+				findReplaceLogic.setReplaceString(fReplaceField.getText());
+			}
+		});
+		fReplaceField.addModifyListener(fReplaceModifyListener);
 		fReplaceField.addModifyListener(listener);
 
 		return panel;
@@ -733,22 +762,26 @@ class FindReplaceDialog extends Dialog {
 			@Override
 			public void widgetSelected(SelectionEvent e) {
 				boolean newState = fIsRegExCheckBox.getSelection();
+				decorate();
+				if (!newState) {
+					regexOk = true;
+				}
 				setupFindReplaceLogic();
 				storeSettings();
 				updateButtonState();
 				setContentAssistsEnablement(newState);
-				fIncrementalCheckBox.setEnabled(findReplaceLogic.isIncrementalSearchAvailable());
+				fIncrementalCheckBox.setEnabled(findReplaceLogic.isAvailable(SearchOptions.INCREMENTAL));
 			}
 		});
 		storeButtonWithMnemonicInMap(fIsRegExCheckBox);
-		fWholeWordCheckBox.setEnabled(findReplaceLogic.isWholeWordSearchAvailable(getFindString()));
+		fWholeWordCheckBox.setEnabled(findReplaceLogic.isAvailable(SearchOptions.WHOLE_WORD));
 		fWholeWordCheckBox.addSelectionListener(new SelectionAdapter() {
 			@Override
 			public void widgetSelected(SelectionEvent e) {
 				updateButtonState();
 			}
 		});
-		fIncrementalCheckBox.setEnabled(findReplaceLogic.isIncrementalSearchAvailable());
+		fIncrementalCheckBox.setEnabled(findReplaceLogic.isAvailable(SearchOptions.INCREMENTAL));
 		return panel;
 	}
 
@@ -859,10 +892,12 @@ class FindReplaceDialog extends Dialog {
 	 * Removes focus changed listener from browser and stores settings for re-open.
 	 */
 	private void handleDialogClose() {
-
 		// remove listeners
 		if (okToUse(fFindField)) {
 			fFindField.removeModifyListener(fFindModifyListener);
+		}
+		if (okToUse(fReplaceField)) {
+			fReplaceField.removeModifyListener(fReplaceModifyListener);
 		}
 
 		if (fParentShell != null) {
@@ -916,14 +951,12 @@ class FindReplaceDialog extends Dialog {
 			return;
 		}
 
-		fFindField.removeModifyListener(fFindModifyListener);
 		if (hasTargetSelection()) {
 			initFindStringFromSelection();
 		} else {
 			initFindStringFromHistory();
 		}
 		fFindField.setSelection(new Point(0, fFindField.getText().length()));
-		fFindField.addModifyListener(fFindModifyListener);
 	}
 
 	private boolean hasTargetSelection() {
@@ -939,7 +972,7 @@ class FindReplaceDialog extends Dialog {
 		String selection = getCurrentSelection();
 		String searchInput = getFirstLine(selection);
 		boolean isSingleLineInput = searchInput.equals(selection);
-		if (findReplaceLogic.isRegExSearchAvailableAndActive()) {
+		if (findReplaceLogic.isAvailableAndActive(SearchOptions.REGEX)) {
 			searchInput = FindReplaceDocumentAdapter.escapeForRegExPattern(selection);
 		}
 		fFindField.setText(searchInput);
@@ -947,7 +980,7 @@ class FindReplaceDialog extends Dialog {
 		if (isSingleLineInput) {
 			// initialize search with current selection to allow for execution of replace
 			// operations
-			findReplaceLogic.findAndSelect(findReplaceLogic.getTarget().getSelection().x, fFindField.getText());
+			findReplaceLogic.findAndSelect(findReplaceLogic.getTarget().getSelection().x);
 		} else {
 			fGlobalRadioButton.setSelection(false);
 			fSelectedRangeRadioButton.setSelection(true);
@@ -1033,9 +1066,10 @@ class FindReplaceDialog extends Dialog {
 		if (!(layoutData instanceof GridData))
 			return;
 		GridData gd = (GridData) layoutData;
-		FieldDecoration dec = FieldDecorationRegistry.getDefault()
+
+		FieldDecoration fieldDecoration = FieldDecorationRegistry.getDefault()
 				.getFieldDecoration(FieldDecorationRegistry.DEC_CONTENT_PROPOSAL);
-		gd.horizontalIndent = dec.getImage().getBounds().width;
+		gd.horizontalIndent = fieldDecoration.getImage().getBounds().width;
 	}
 
 	/**
@@ -1070,13 +1104,14 @@ class FindReplaceDialog extends Dialog {
 			boolean isFindStringSet = str != null && !str.isEmpty();
 			String selectionString = enable ? target.getSelection().toString() : ""; //$NON-NLS-1$
 			boolean isTargetEditable = enable ? target.isEditable() : false;
-			boolean isRegExSearchAvailableAndActive = findReplaceLogic.isRegExSearchAvailableAndActive();
+			boolean isRegExSearchAvailableAndActive = findReplaceLogic.isAvailableAndActive(SearchOptions.REGEX);
 			boolean isSelectionGoodForReplace = selectionString != "" //$NON-NLS-1$
 					|| !isRegExSearchAvailableAndActive;
 
-			fWholeWordCheckBox.setEnabled(findReplaceLogic.isWholeWordSearchAvailable(getFindString()));
-			fFindNextButton.setEnabled(enable && isFindStringSet);
-			fSelectAllButton.setEnabled(enable && isFindStringSet && (target instanceof IFindReplaceTargetExtension4));
+			fWholeWordCheckBox.setEnabled(findReplaceLogic.isAvailable(SearchOptions.WHOLE_WORD));
+			fFindNextButton.setEnabled(enable && isFindStringSet && regexOk);
+			fSelectAllButton.setEnabled(
+					enable && isFindStringSet && (target instanceof IFindReplaceTargetExtension4) && regexOk);
 			fReplaceSelectionButton.setEnabled(
 					!disableReplace && enable && isTargetEditable && hasActiveSelection && isSelectionGoodForReplace);
 			fReplaceFindButton.setEnabled(!disableReplace && enable && isTargetEditable && isFindStringSet
@@ -1084,7 +1119,6 @@ class FindReplaceDialog extends Dialog {
 			fReplaceAllButton.setEnabled(enable && isTargetEditable && isFindStringSet);
 		}
 	}
-
 
 	/**
 	 * Updates the given combo with the given content.
@@ -1106,10 +1140,7 @@ class FindReplaceDialog extends Dialog {
 	 */
 	private void updateFindAndReplaceHistory() {
 		updateFindHistory();
-		if (okToUse(fReplaceField)) {
-			updateHistory(fReplaceField, replaceHistory);
-		}
-
+		updateReplaceHistory();
 	}
 
 	/**
@@ -1120,11 +1151,29 @@ class FindReplaceDialog extends Dialog {
 			fFindField.removeModifyListener(fFindModifyListener);
 
 			// XXX: Workaround for Combo bug on Linux (see bug 404202 and bug 410603)
-			if (Util.isLinux())
+			if (Util.isLinux()) {
 				fFindModifyListener.ignoreNextEvent();
+			}
 
 			updateHistory(fFindField, findHistory);
 			fFindField.addModifyListener(fFindModifyListener);
+		}
+	}
+
+	/**
+	 * Called after executed find action to update the history.
+	 */
+	private void updateReplaceHistory() {
+		if (okToUse(fReplaceField)) {
+			fReplaceField.removeModifyListener(fReplaceModifyListener);
+
+			// XXX: Workaround for Combo bug on Linux (see bug 404202 and bug 410603)
+			if (Util.isLinux()) {
+				fReplaceModifyListener.ignoreNextEvent();
+			}
+
+			updateHistory(fReplaceField, replaceHistory);
+			fReplaceField.addModifyListener(fReplaceModifyListener);
 		}
 	}
 
@@ -1170,11 +1219,11 @@ class FindReplaceDialog extends Dialog {
 		}
 
 		if (okToUse(fWholeWordCheckBox)) {
-			fWholeWordCheckBox.setEnabled(findReplaceLogic.isWholeWordSearchAvailable(getFindString()));
+			fWholeWordCheckBox.setEnabled(findReplaceLogic.isAvailable(SearchOptions.WHOLE_WORD));
 		}
 
 		if (okToUse(fIncrementalCheckBox)) {
-			fIncrementalCheckBox.setEnabled(findReplaceLogic.isIncrementalSearchAvailable());
+			fIncrementalCheckBox.setEnabled(findReplaceLogic.isAvailable(SearchOptions.INCREMENTAL));
 		}
 
 		if (okToUse(fReplaceLabel)) {
@@ -1189,7 +1238,7 @@ class FindReplaceDialog extends Dialog {
 
 		updateButtonState();
 
-		setContentAssistsEnablement(findReplaceLogic.isRegExSearchAvailableAndActive());
+		setContentAssistsEnablement(findReplaceLogic.isAvailableAndActive(SearchOptions.REGEX));
 	}
 
 	/**
@@ -1303,19 +1352,29 @@ class FindReplaceDialog extends Dialog {
 		}
 	}
 
-	/**
-	 * Evaluate the status of the FindReplaceLogic object.
-	 */
+	private void decorate() {
+		if (fIsRegExCheckBox.getSelection()) {
+			regexOk = SearchDecoration.validateRegex(fFindField.getText(), fFindFieldDecoration);
+			updateButtonState(regexOk);
+
+		} else {
+			fFindFieldDecoration.hide();
+		}
+	}
+
 	private void evaluateFindReplaceStatus() {
 		IFindReplaceStatus status = findReplaceLogic.getStatus();
 
-		String dialogMessage = status.accept(new FindReplaceLogicMessageGenerator());
-		fStatusLabel.setText(dialogMessage);
-		if (status.isInputValid()) {
-			fStatusLabel.setForeground(fReplaceLabel.getForeground());
-		} else {
-			fStatusLabel.setForeground(JFaceColors.getErrorText(fStatusLabel.getDisplay()));
+		if (!(status instanceof InvalidRegExStatus)) {
+			String dialogMessage = status.accept(new FindReplaceLogicMessageGenerator());
+			fStatusLabel.setText(dialogMessage);
+			if (status.isInputValid()) {
+				fStatusLabel.setForeground(fReplaceLabel.getForeground());
+			} else {
+				fStatusLabel.setForeground(JFaceColors.getErrorText(fStatusLabel.getDisplay()));
+			}
 		}
+
 	}
 
 	private String getCurrentSelection() {
@@ -1324,4 +1383,23 @@ class FindReplaceDialog extends Dialog {
 			return null;
 		return target.getSelectionText();
 	}
+
+	@SuppressWarnings("nls")
+	private void assignIDs() {
+		fFindField.setData(ID_DATA_KEY, "searchInput");
+		fReplaceField.setData(ID_DATA_KEY, "replaceInput");
+		fForwardRadioButton.setData(ID_DATA_KEY, "searchForward");
+		fGlobalRadioButton.setData(ID_DATA_KEY, "globalSearch");
+		fSelectedRangeRadioButton.setData(ID_DATA_KEY, "searchInSelection");
+		fCaseCheckBox.setData(ID_DATA_KEY, "caseSensitiveSearch");
+		fWrapCheckBox.setData(ID_DATA_KEY, "wrappedSearch");
+		fWholeWordCheckBox.setData(ID_DATA_KEY, "wholeWordSearch");
+		fIncrementalCheckBox.setData(ID_DATA_KEY, "incrementalSearch");
+		fIsRegExCheckBox.setData(ID_DATA_KEY, "regExSearch");
+
+		fReplaceSelectionButton.setData(ID_DATA_KEY, "replaceOne");
+		fReplaceFindButton.setData(ID_DATA_KEY, "replaceFindOne");
+		fReplaceAllButton.setData(ID_DATA_KEY, "replaceAll");
+	}
+
 }

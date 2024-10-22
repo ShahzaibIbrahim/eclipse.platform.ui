@@ -85,15 +85,15 @@ ColorDefinition#org-eclipse-ui-workbench-ACTIVE_NOFOCUS_TAB_BG_END {
 }
 
 ColorDefinition#org-eclipse-ui-workbench-ACTIVE_NOFOCUS_TAB_TEXT_COLOR {
-	color: #3b3b3b;
+	color: #000000;
 }
 
 ColorDefinition#org-eclipse-ui-workbench-ACTIVE_TAB_TEXT_COLOR {
-   color: #3b3b3b;
+	color: #000000;
 }
 
 ColorDefinition#org-eclipse-ui-workbench-INACTIVE_TAB_TEXT_COLOR {
-   color: #3b3b3b;
+	color: #000000;
 }
 
 .MTrimmedWindow {
@@ -122,15 +122,15 @@ CTabFolder.MArea {
 }
 
 CTabFolder Canvas {
-	background-color: #ffffff;
+	background-color: #f8f8f8;
 }
 
 .MTrimBar#org-eclipse-ui-main-toolbar {
-	background-color: '#f8f8f8';
+	background-color: #f8f8f8;
 }
 
 .MTrimBar#org-eclipse-ui-trim-status {
-	background-color: '#f8f8f8';
+	background-color: #f8f8f8;
 }
 
 .View Composite,
@@ -186,40 +186,40 @@ CTabFolder Canvas {
 }
 
 .MPartStack{
-	swt-selected-tab-highlight: #2160bb;
-    swt-selected-highlight-top: false;
+	swt-selected-tab-highlight: #A0A0A0;
+	swt-selected-highlight-top: false;
 }
 
 .MPartStack.active {
-    swt-selected-tab-highlight: #2160bb;
-    swt-selected-highlight-top: false;
+	swt-selected-tab-highlight: #2160bb;
+	swt-selected-highlight-top: false;
 }
 
 /* text color and background color of unselected tabs in editor*/
 #org-eclipse-ui-editorss CTabItem{
-	color: '#6A6A6A';
-	background-color: '#f8f8f8';
+	color: #000000;
+	background-color: #f8f8f8;
 }
 
 /*text color and background color of selected tab in editor */
 #org-eclipse-ui-editorss CTabItem:selected{
-	color: '#3b3b3b';
-	background-color: '#FFFFFF';
+	color: #000000;
+	background-color: #FFFFFF;
 }
 
 #org-eclipse-ui-editorss CTabFolder{
-	swt-selected-tab-fill : '#ffffff';
-	swt-selected-tab-highlight: '#2160bb';
-    swt-selected-highlight-top: true;	
+	swt-selected-tab-fill : #ffffff;
+	swt-selected-tab-highlight: #8a8a8a;
+	swt-selected-highlight-top: true;	
 	swt-tab-outline:#e5e5e5; 
 	swt-tab-outer-keyline: #e5e5e5;
 	swt-draw-custom-tab-content-background: true;
-	swt-unselected-hot-tab-color-background:'#FFFFFF';
+	swt-unselected-hot-tab-color-background:#ffffff;
 }
 
 #org-eclipse-ui-editorss CTabFolder.active {
-    swt-selected-tab-highlight: '#2160bb';
-    swt-selected-highlight-top: true;
+	swt-selected-tab-highlight: #2160bb;
+	swt-selected-highlight-top: true;
 }
 
 #org-eclipse-e4-ui-compatibility-editor Composite{

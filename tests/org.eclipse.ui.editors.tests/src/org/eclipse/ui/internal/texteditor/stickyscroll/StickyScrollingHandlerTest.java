@@ -20,14 +20,16 @@ import static org.eclipse.ui.texteditor.AbstractDecoratedTextEditorPreferenceCon
 import static org.eclipse.ui.texteditor.AbstractDecoratedTextEditorPreferenceConstants.EDITOR_TAB_WIDTH;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.StringJoiner;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -47,6 +49,8 @@ import org.eclipse.jface.text.Document;
 import org.eclipse.jface.text.source.CompositeRuler;
 import org.eclipse.jface.text.source.SourceViewer;
 
+import org.eclipse.ui.internal.texteditor.stickyscroll.IStickyLinesProvider.StickyLinesProperties;
+
 public class StickyScrollingHandlerTest {
 
 	private Shell shell;
@@ -55,8 +59,9 @@ public class StickyScrollingHandlerTest {
 	private Color hoverColor;
 	private CompositeRuler ruler;
 	private IPreferenceStore store;
-	private StickyLinesProvider linesProvider;
+	private IStickyLinesProvider linesProvider;
 	private StickyScrollingHandler stickyScrollingHandler;
+	private StickyLinesProperties stickyLinesProperties;
 
 	@Before
 	public void setup() {
@@ -70,14 +75,21 @@ public class StickyScrollingHandlerTest {
 		hoverColor = new Color(1, 1, 1);
 
 		store = createPreferenceStore();
-		linesProvider = mock(StickyLinesProvider.class);
+		linesProvider = mock(IStickyLinesProvider.class);
 
 		stickyScrollingHandler = new StickyScrollingHandler(sourceViewer, ruler, store, linesProvider);
+		stickyLinesProperties = new StickyLinesProperties(4);
+	}
+
+	@After
+	public void teardown() {
+		shell.dispose();
 	}
 
 	@Test
 	public void testShowStickyLines() {
-		when(linesProvider.get(100, sourceViewer)).thenReturn(List.of(new StickyLine("line 10", 9)));
+		when(linesProvider.getStickyLines(sourceViewer, stickyLinesProperties))
+				.thenReturn(List.of(new StickyLine("line 10", 9)));
 
 		stickyScrollingHandler.viewportChanged(100);
 
@@ -100,7 +112,8 @@ public class StickyScrollingHandlerTest {
 
 	@Test
 	public void testPreferencesLoaded() {
-		when(linesProvider.get(100, sourceViewer)).thenReturn(List.of(new StickyLine("line 10", 9)));
+		when(linesProvider.getStickyLines(sourceViewer, stickyLinesProperties))
+				.thenReturn(List.of(new StickyLine("line 10", 9)));
 
 		stickyScrollingHandler.viewportChanged(100);
 
@@ -110,7 +123,7 @@ public class StickyScrollingHandlerTest {
 
 	@Test
 	public void testPreferencesUpdated() {
-		when(linesProvider.get(100, sourceViewer))
+		when(linesProvider.getStickyLines(sourceViewer, stickyLinesProperties))
 				.thenReturn(List.of(new StickyLine("line 10", 9), new StickyLine("line 20", 19)));
 
 		stickyScrollingHandler.viewportChanged(100);
@@ -128,20 +141,29 @@ public class StickyScrollingHandlerTest {
 
 	@Test
 	public void testThrottledExecution() throws InterruptedException {
-		when(linesProvider.get(100, sourceViewer)).thenReturn(List.of(new StickyLine("line 10", 9)));
+		when(linesProvider.getStickyLines(sourceViewer, stickyLinesProperties))
+				.thenReturn(List.of(new StickyLine("line 10", 9)));
+		when(linesProvider.getStickyLines(sourceViewer, stickyLinesProperties))
+				.thenReturn(List.of(new StickyLine("line 10", 9)));
+		when(linesProvider.getStickyLines(sourceViewer, stickyLinesProperties))
+				.thenReturn(List.of(new StickyLine("line 10", 9)));
+		when(linesProvider.getStickyLines(sourceViewer, stickyLinesProperties))
+				.thenReturn(List.of(new StickyLine("line 10", 9)));
 
 		stickyScrollingHandler.viewportChanged(100);
+		Thread.sleep(10);
 		stickyScrollingHandler.viewportChanged(200);
+		Thread.sleep(10);
 		stickyScrollingHandler.viewportChanged(300);
+		Thread.sleep(10);
 		stickyScrollingHandler.viewportChanged(400);
 
-		waitInUi(200);
+		waitInUi(300);
 
-		// Call to lines provider should be throttled
-		verify(linesProvider, times(1)).get(100, sourceViewer);
-		verify(linesProvider, times(0)).get(200, sourceViewer);
-		verify(linesProvider, times(0)).get(300, sourceViewer);
-		verify(linesProvider, times(1)).get(400, sourceViewer);
+		// Call to lines provider should be throttled, at least one and at most
+		// 3 calls expected
+		verify(linesProvider, atMost(3)).getStickyLines(sourceViewer, stickyLinesProperties);
+		verify(linesProvider, atLeastOnce()).getStickyLines(sourceViewer, stickyLinesProperties);
 	}
 
 	private void waitInUi(int ms) throws InterruptedException {

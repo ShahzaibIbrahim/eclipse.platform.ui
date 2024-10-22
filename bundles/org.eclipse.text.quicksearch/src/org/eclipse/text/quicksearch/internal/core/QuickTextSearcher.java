@@ -13,12 +13,20 @@
 package org.eclipse.text.quicksearch.internal.core;
 
 import java.io.InputStreamReader;
-import java.util.HashSet;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
@@ -32,6 +40,7 @@ import org.eclipse.text.quicksearch.internal.util.LightSchedulingRule;
 import org.eclipse.text.quicksearch.internal.util.LineReader;
 
 public class QuickTextSearcher {
+	private static int MAX_BUFFER_LENGTH = 999_999; // read max 1MB bytes => max 2MB chars.
 	private final QuickTextSearchRequestor requestor;
 	private QuickTextQuery query;
 
@@ -39,14 +48,14 @@ public class QuickTextSearcher {
 	 * Keeps track of currently found matches. Items are added as they are found and may also
 	 * be removed when the query changed and they become invalid.
 	 */
-	private Set<LineItem> matches = new HashSet<>(2000);
+	private final Set<LineItem> matches = ConcurrentHashMap.newKeySet(2000);
 
 	/**
 	 * Scheduling rule used by Jobs that work on the matches collection.
 	 */
 	private ISchedulingRule matchesRule = new LightSchedulingRule("QuickSearchMatchesRule"); //$NON-NLS-1$
 
-	private SearchInFilesWalker walker = null;
+	private final SearchInFilesWalker walker;
 	private IncrementalUpdateJob incrementalUpdate;
 
 	/**
@@ -75,7 +84,8 @@ public class QuickTextSearcher {
 	 * While searching in a file, this field will be set. This can be used to show the name
 	 * of the 'current file' in the progress area of the quicksearch dialog.
 	 */
-	private IFile currentFile = null;
+	private volatile IFile currentFile = null;
+	public volatile int searchTookMs;
 
 	/**
 	 * Flag to disable incremental filtering logic based on incremental
@@ -124,35 +134,62 @@ public class QuickTextSearcher {
 
 	private final class SearchInFilesWalker extends ResourceWalker {
 
+		@Override
+		public IStatus run(IProgressMonitor monitor) {
+			searchTookMs = 0;
+			long n0 = System.nanoTime();
+			try {
+				return super.run(monitor);
+			} finally {
+				currentFile = null;
+				long n1 = System.nanoTime();
+				if (matches.isEmpty()) {
+					searchTookMs = (int) ((n1 - n0) / 1_000_000);
+				}
+			}
+		}
 
 		@Override
-		protected void visit(IFile f, IProgressMonitor mon) {
-			if (checkCanceled(mon)) {
-				return;
-			}
-
+		protected boolean searchIn(IFile f, BooleanSupplier canceled) {
 			currentFile = f;
-			try (LineReader lr = new LineReader(new InputStreamReader(f.getContents(true), f.getCharset()), MAX_LINE_LEN)) {
-				String line = null;
+			return search(f, canceled, MAX_LINE_LEN, query.pattern, QuickTextSearcher.this::add);
+		}
+
+		private static boolean search(IFile f, BooleanSupplier canceled,
+				int maxLineLength, Pattern pattern, Consumer<LineItem> add) {
+			if (canceled.getAsBoolean()) {
+				return false;
+			}
+			try (LineReader lr = new LineReader(getReader(f),
+					maxLineLength)) {
+				String line;
 				int lineIndex = 1;
 				while ((line = lr.readLine()) != null) {
 					int offset = lr.getLastLineOffset();
-					if (checkCanceled(mon)) {
-						return;
+					if (canceled.getAsBoolean()) {
+						return false;
 					}
 
-					boolean found = query.matchItem(line);
-					if (found) {
+					Matcher matcher = pattern.matcher(line);
+					if (matcher.find()) {
 						LineItem lineItem = new LineItem(f, line, lineIndex, offset);
-						add(lineItem);
+						add.accept(lineItem);
 					}
 
 					lineIndex++;
 				}
 			} catch (Exception e) {
 				// ignored
-			} finally {
-				currentFile = null;
+			}
+			return true;
+		}
+
+		private static Reader getReader(IFile f) throws UnsupportedEncodingException, CoreException {
+			String shortString = toShortString(f);
+			if (shortString != null) {
+				return new StringReader(shortString);
+			} else {
+				return new InputStreamReader(f.getContents(true), f.getCharset());
 			}
 		}
 
@@ -164,18 +201,27 @@ public class QuickTextSearcher {
 			}
 		}
 
-		private boolean checkCanceled(IProgressMonitor mon) {
-			return mon.isCanceled();
-		}
-
-		public void requestMoreResults() {
-			int currentSize = matches.size();
-			maxResults = Math.max(maxResults, currentSize + currentSize/10);
-			resume();
-		}
-
 	}
-
+	/**
+	 * Try to get a content as String. Avoids Streaming.
+	 */
+	private static String toShortString(IFile file) {
+		/**
+		 * Just any number such that the most source files will fit in. And not too
+		 * big to avoid out of memory.
+		 **/
+		try {
+			byte[] content = file.readNBytes(MAX_BUFFER_LENGTH);
+			int length = content.length;
+			if (length >= MAX_BUFFER_LENGTH) {
+				return null;
+			}
+			String charset = file.getCharset();
+			return new String(content, charset);
+		} catch (Exception e) {
+			return null;
+		}
+	}
 	/**
 	 * This job updates already found matches when the query is changed.
 	 * Both the walker job and this job share the same scheduling rule so
@@ -203,9 +249,11 @@ public class QuickTextSearcher {
 			} else {
 				query = nq;
 				forceRefresh = false;
-				performRestart();
+				if (!monitor.isCanceled()) { // avoid restart if dialog got closed
+					performRestart();
+				}
 			}
-			return monitor.isCanceled()?Status.CANCEL_STATUS:Status.OK_STATUS;
+			return monitor.isCanceled() ? Status.CANCEL_STATUS : Status.OK_STATUS;
 		}
 
 		private void performIncrementalUpdate(IProgressMonitor mon) {
@@ -213,7 +261,8 @@ public class QuickTextSearcher {
 			while (items.hasNext() && !mon.isCanceled()) {
 
 				LineItem item = items.next();
-				if (query.matchItem(item)) {
+				Matcher matcher = query.pattern.matcher(item.getText());
+				if (matcher.find()) {
 					//Match still valid but may need updating highlighted text in the UI:
 					requestor.update(item);
 				} else {
@@ -228,31 +277,26 @@ public class QuickTextSearcher {
 		}
 
 		private void performRestart() {
-			//walker may be null if dialog got closed already before we managed to
-			// 'performRestart'.
-			if (walker!=null) {
-				//since we are inside Job here that uses same scheduling rule as walker, we
-				//know walker is not currently executing. so walker cancel should be instantenous
-				matches.clear();
-				requestor.clear();
-				walker.cancel();
-				if (!query.isTrivial()) {
-					walker.init(); //Reinitialize the walker work queue to its starting state
-					walker.resume(); //Allow walker to resume when we release the scheduling rule.
-				} else {
-					walker.stop();
-				}
+			//since we are inside Job here that uses same scheduling rule as walker, we
+			//know walker is not currently executing. so walker cancel should be instantenous
+			matches.clear();
+			requestor.clear();
+			walker.cancel();
+			if (!query.isTrivial()) {
+				walker.init(); //Reinitialize the walker work queue to its starting state
+				walker.resume(); //Allow walker to resume when we release the scheduling rule.
+			} else {
+				walker.stop();
 			}
 		}
 
 	}
 
 	private void add(LineItem line) {
-		if (matches.add(line)) {
+		if (!isActive()) {
+			walker.suspend();
+		} else if (matches.add(line)) {
 			requestor.add(line);
-			if (!isActive()) {
-				walker.suspend();
-			}
 		}
 	}
 
@@ -261,7 +305,7 @@ public class QuickTextSearcher {
 			return;
 		}
 		this.newQuery = newQuery;
-		this.forceRefresh = true;
+		this.forceRefresh = force;
 		scheduleIncrementalUpdate();
 	}
 
@@ -304,19 +348,13 @@ public class QuickTextSearcher {
 		//Walker can be null if job was canceled because dialog closed. But stuff like
 		//the job that shows 'Searching ...' doesn't instantly stop and may still
 		//be asking the incremental update job whether its done.
-		return /*(incrementalUpdate != null && incrementalUpdate.getState() != Job.NONE) ||*/ (walker!=null && walker.isDone());
-	}
-
-	public void requestMoreResults() {
-		if (walker!=null && !walker.isDone()) {
-			walker.requestMoreResults();
-		}
+		return /*(incrementalUpdate != null && incrementalUpdate.getState() != Job.NONE) ||*/ walker.isDone();
 	}
 
 	public void cancel() {
-		if (walker!=null) {
-			walker.cancel();
-			walker = null;
+		walker.cancel();
+		if (incrementalUpdate instanceof IncrementalUpdateJob update) {
+			update.cancel();
 		}
 	}
 

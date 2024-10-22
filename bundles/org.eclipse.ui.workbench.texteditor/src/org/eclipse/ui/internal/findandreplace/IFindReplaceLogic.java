@@ -26,6 +26,25 @@ import org.eclipse.ui.internal.findandreplace.status.IFindReplaceStatus;
 public interface IFindReplaceLogic {
 
 	/**
+	 * Sets the string to be used for searching in find and replace operations. In
+	 * case the {@link SearchOptions#INCREMENTAL} is active, this also triggers an
+	 * incremental search operation, starting from the current incremental base
+	 * location. This also updates the search status accordingly.
+	 *
+	 * @param findString the find string to use, must not be null
+	 *
+	 * @see #getStatus()
+	 */
+	public void setFindString(String findString);
+
+	/**
+	 * Sets the string to be used as a replacement in replace operations.
+	 *
+	 * @param replaceString the replace string to use, must not be null
+	 */
+	public void setReplaceString(String replaceString);
+
+	/**
 	 * Activate a search option
 	 *
 	 * @param searchOption option
@@ -46,6 +65,29 @@ public interface IFindReplaceLogic {
 	public boolean isActive(SearchOptions searchOption);
 
 	/**
+	 * Returns whether the given search options is currently available. This
+	 * includes validation of whether the target supports a specific option (such as
+	 * {@link SearchOptions#REGEX}) and the compatibility of search options (such as
+	 * {@link SearchOptions#INCREMENTAL} not being available when
+	 * {@link SearchOptions#REGEX} is active).
+	 *
+	 * @param searchOption the search option to check for availability
+	 *
+	 * @return whether the search option is currently available
+	 */
+	public boolean isAvailable(SearchOptions searchOption);
+
+	/**
+	 * Returns whether the given search options is currently available and active.
+	 * Combines {@link #isActive(SearchOptions)} and
+	 * {@link #isAvailable(SearchOptions)}.
+	 *
+	 * @param searchOption the search option to check
+	 * @return whether the search option is currently available and active
+	 */
+	public boolean isAvailableAndActive(SearchOptions searchOption);
+
+	/**
 	 * Returns the current status of FindReplaceLogic. The Status can inform about
 	 * events such as an error happening, a warning happening (e.g.: the
 	 * search-string wasn't found) and brings a method to retrieve a message that
@@ -56,80 +98,52 @@ public interface IFindReplaceLogic {
 	public IFindReplaceStatus getStatus();
 
 	/**
-	 * RegEx-Search is not possible on every target. Hence, even after {code
-	 * activate(SearchOptions.REGEX)}, we need to check, whether we may use
-	 * RegEx-Search.
-	 *
-	 * @return whether RegEx search is currently used
-	 */
-	public boolean isRegExSearchAvailableAndActive();
-
-	/**
-	 * {@return whether incremental search may be performed by the
-	 * find/replace-logic based on the currently active options}
-	 */
-	public boolean isIncrementalSearchAvailable();
-
-	/**
-	 * Replaces all occurrences of the user's findString with the replace string.
+	 * Replaces all occurrences of the current find string with the replace string.
 	 * Indicate to the user the number of replacements that occur.
-	 *
-	 * @param findString    The string that will be replaced
-	 * @param replaceString The string that will replace the findString
 	 */
-	public void performReplaceAll(String findString, String replaceString);
+	public void performReplaceAll();
 
 	/**
-	 * Selects all occurrences of findString.
-	 *
-	 * @param findString The String to find and select
+	 * Selects all occurrences of the current find string.
 	 */
-	public void performSelectAll(String findString);
+	public void performSelectAll();
 
 	/**
-	 * Locates the user's findString in the target. If incremental search is
+	 * Locates the current find string in the target. If incremental search is
 	 * activated, the search will be performed starting from an incremental search
 	 * position, which can be reset using {@link #resetIncrementalBaseLocation()}.
-	 * If incremental search is activated and RegEx search is activated, nothing
-	 * happens.
 	 *
-	 * @param searchString the String to search for
 	 * @return Whether the string was found in the target
-	 *
 	 */
-	public boolean performSearch(String searchString);
+	public boolean performSearch();
 
 	/**
-	 * Searches for a string starting at the given offset and using the specified
-	 * search directives. If a string has been found it is selected and its start
-	 * offset is returned.
+	 * Searches for the current find string starting at the given offset and using
+	 * the specified search directives. If a string has been found it is selected
+	 * and its start offset is returned.
 	 *
-	 * @param offset        the offset at which searching starts
-	 * @param findString    the string which should be found
+	 * @param offset     the offset at which searching starts
 	 * @return the position of the specified string, or -1 if the string has not
 	 *         been found
 	 */
-	public int findAndSelect(int offset, String findString);
+	public int findAndSelect(int offset);
 
 	/**
-	 * Replaces the selection and jumps to the next occurrence of findString
-	 * instantly. Will not fail in case the selection is invalidated, eg. after a
-	 * replace operation or after the target was updated
+	 * Replaces the current selection if it matches the find string or performs a
+	 * search and does a replacement. It then performs another search for the
+	 * current find string. Will not fail in case the selection is invalidated,
+	 * e.g., after a replace operation or after the target was updated.
 	 *
-	 * @param findString    the string to replace
-	 * @param replaceString the string to put in place of findString
 	 * @return whether a replacement has been performed
 	 */
-	public boolean performReplaceAndFind(String findString, String replaceString);
+	public boolean performReplaceAndFind();
 
 	/**
 	 * Selects first and then replaces the next occurrence.
 	 *
-	 * @param findString    the string to replace
-	 * @param replaceString the new string that will replace the findString
 	 * @return whether a replacement has been performed
 	 */
-	public boolean performSelectAndReplace(String findString, String replaceString);
+	public boolean performSelectAndReplace();
 
 	/**
 	 * Updates the target on which to perform Find/Replace-operations on.
@@ -154,16 +168,6 @@ public interface IFindReplaceLogic {
 	public IFindReplaceTarget getTarget();
 
 	/**
-	 * Returns <code>true</code> if searching can be restricted to entire words,
-	 * <code>false</code> if not. Searching for whole words requires the given find
-	 * string to be an entire word and the regex search option to be disabled.
-	 *
-	 * @param findString the string that is currently being searched for.
-	 * @return <code>true</code> if the search can be restricted to whole words
-	 */
-	public boolean isWholeWordSearchAvailable(String findString);
-
-	/**
 	 * Initializes the anchor used as the starting point for incremental searching.
 	 * Subsequent incremental searches will start from the first letter of the
 	 * currently selected range in the FindReplaceTarget.
@@ -181,7 +185,6 @@ public interface IFindReplaceLogic {
 	 * <li>Backward search operations will use the end of the selection as the
 	 * starting point.</li>
 	 * </ul>
-	 * </p>
 	 */
 	void resetIncrementalBaseLocation();
 

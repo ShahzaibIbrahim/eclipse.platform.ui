@@ -14,6 +14,7 @@
 package org.eclipse.ui.workbench.texteditor.tests;
 
 import static org.eclipse.ui.internal.findandreplace.FindReplaceTestUtil.runEventQueue;
+import static org.eclipse.ui.internal.findandreplace.FindReplaceTestUtil.waitForFocus;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
@@ -28,6 +29,7 @@ import org.eclipse.swt.widgets.Event;
 
 import org.eclipse.text.tests.Accessor;
 
+import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.util.Util;
 
 import org.eclipse.jface.text.IFindReplaceTarget;
@@ -50,8 +52,10 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 		}
 		Accessor fFindReplaceDialogStubAccessor= new Accessor(fFindReplaceDialogStub, "org.eclipse.ui.texteditor.FindReplaceAction$FindReplaceDialogStub", getClass().getClassLoader());
 
-		Accessor dialogAccessor= new Accessor(fFindReplaceDialogStubAccessor.invoke("getDialog", null), "org.eclipse.ui.texteditor.FindReplaceDialog", getClass().getClassLoader());
-		return new DialogAccess(dialogAccessor);
+		Dialog dialog= (Dialog) fFindReplaceDialogStubAccessor.invoke("getDialog", null);
+		DialogAccess uiAccess= new DialogAccess(getFindReplaceTarget(), dialog);
+		waitForFocus(uiAccess::hasFocus, testName.getMethodName());
+		return uiAccess;
 	}
 
 	@Test
@@ -61,11 +65,9 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 		initializeTextViewerWithFindReplaceUI("line\nline\nline");
 		DialogAccess dialog= getDialog();
 
-		dialog.findCombo.setFocus();
+		dialog.getFindCombo().setFocus();
 		dialog.setFindText("line");
 		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
-		ensureHasFocusOnGTK();
-
 		assertTrue(dialog.getFindCombo().isFocusControl());
 
 		Button wrapCheckBox= dialog.getButtonForSearchOption(SearchOptions.WRAP);
@@ -85,9 +87,8 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 
 		initializeTextViewerWithFindReplaceUI("");
 		DialogAccess dialog= getDialog();
-
 		dialog.setFindText("line");
-		ensureHasFocusOnGTK();
+		runEventQueue();
 
 		Button wrapCheckBox= dialog.getButtonForSearchOption(SearchOptions.WRAP);
 		wrapCheckBox.setFocus();
@@ -121,8 +122,7 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 		DialogAccess dialog= getDialog();
 
 		dialog.setFindText("line");
-		ensureHasFocusOnGTK();
-		IFindReplaceTarget target= dialog.getTarget();
+		IFindReplaceTarget target= getFindReplaceTarget();
 
 		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertEquals(0, (target.getSelection()).x);
@@ -152,7 +152,7 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 
 		assertThat(dialog.getFindText(), is("text"));
 
-		IFindReplaceTarget target= dialog.getTarget();
+		IFindReplaceTarget target= getFindReplaceTarget();
 		assertEquals(0, (target.getSelection()).x);
 		assertEquals(4, (target.getSelection()).y);
 
@@ -209,7 +209,7 @@ public class FindReplaceDialogTest extends FindReplaceUITest<DialogAccess> {
 		dialog.setFindText("two");
 		dialog.select(SearchOptions.WHOLE_WORD);
 		dialog.select(SearchOptions.WRAP);
-		IFindReplaceTarget target= dialog.getTarget();
+		IFindReplaceTarget target= getFindReplaceTarget();
 
 		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertEquals(0, (target.getSelection()).x);

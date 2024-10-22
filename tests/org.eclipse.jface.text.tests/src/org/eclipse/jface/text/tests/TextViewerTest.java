@@ -24,10 +24,13 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import org.junit.After;
 import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestWatcher;
+
+import org.eclipse.test.Screenshots;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StyledText;
@@ -73,20 +76,18 @@ import org.eclipse.jface.text.tests.util.DisplayHelper;
  */
 public class TextViewerTest {
 
-	@Rule public ScreenshotOnFailureRule screenshotRule = new ScreenshotOnFailureRule();
 	private Shell fShell;
 
-	@After
-	public void tearDown() {
-		if (fShell != null && !fShell.isDisposed()) {
-			fShell.dispose();
-		}
-		fShell= null;
+	@Before
+	public void before() {
+		fShell= new Shell();
 	}
+
+	@Rule
+	public TestWatcher screenshotRule= Screenshots.onFailure(() -> fShell);
 
 	@Test
 	public void testSetRedraw_Bug441827() throws Exception {
-		fShell= new Shell();
 		TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		Document document= new Document("abc");
 		textViewer.setDocument(document);
@@ -106,7 +107,6 @@ public class TextViewerTest {
 
 	@Test
 	public void testCaretMoveChangesSelection() throws Exception {
-		fShell= new Shell();
 		TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		Document document= new Document("abc");
 		textViewer.setDocument(document);
@@ -124,7 +124,6 @@ public class TextViewerTest {
 
 	@Test
 	public void testGetCachedSelection() throws Exception {
-		fShell= new Shell();
 		TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		Document document= new Document("abc");
 		textViewer.setDocument(document);
@@ -140,7 +139,6 @@ public class TextViewerTest {
 
 	@Test
 	public void testBlockSelectionAccessors() throws Exception {
-		fShell= new Shell();
 		ITextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		Document document= new Document("0123\n4567\n89ab\ncdef");
 		textViewer.setDocument(document);
@@ -185,7 +183,6 @@ public class TextViewerTest {
 	@Test
 	public void testCtrlHomeViewportListener() {
 		Assume.assumeFalse("See bug 541415. For whatever reason, this shortcut doesn't work on Mac", Util.isMac());
-		fShell= new Shell();
 		fShell.setLayout(new FillLayout());
 		fShell.setSize(500, 200);
 		SourceViewer textViewer= new SourceViewer(fShell, null, SWT.NONE);
@@ -208,7 +205,6 @@ public class TextViewerTest {
 	@Test
 	public void testCtrlEndViewportListener() {
 		Assume.assumeFalse("See bug 541415. For whatever reason, this shortcut doesn't work on Mac", Util.isMac());
-		fShell= new Shell();
 		fShell.setLayout(new FillLayout());
 		fShell.setSize(500, 200);
 		SourceViewer textViewer= new SourceViewer(fShell, null, SWT.NONE);
@@ -232,7 +228,6 @@ public class TextViewerTest {
 	 */
 	@Test
 	public void testDefaultContentImplementation() {
-		fShell= new Shell();
 		final StyledTextContent content;
 		try {
 			final TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
@@ -318,7 +313,6 @@ public class TextViewerTest {
 
 	@Test
 	public void testShiftLeft() {
-		fShell= new Shell();
 		TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		{
 			// Normal case, both lines match prefix
@@ -389,7 +383,6 @@ public class TextViewerTest {
 
 	@Test
 	public void testURLHyperlinkDetector() {
-		fShell= new Shell();
 		TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		checkHyperlink(textViewer, 3, "https://foo ", "[https://foo]");
 		checkHyperlink(textViewer, 0, "", "[]");
@@ -412,7 +405,6 @@ public class TextViewerTest {
 
 	@Test
 	public void testPasteMultiLines() {
-		fShell= new Shell();
 		TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		Document document= new Document();
 		textViewer.setDocument(document);
@@ -429,7 +421,6 @@ public class TextViewerTest {
 
 	@Test
 	public void testSetSelectionNoDoc() {
-		fShell= new Shell();
 		TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		textViewer.setSelection(TextSelection.emptySelection());
 		// assert no exception is thrown
@@ -437,7 +428,6 @@ public class TextViewerTest {
 
 	@Test
 	public void testSelectionFromViewerState() {
-		fShell= new Shell();
 		TextViewer textViewer= new TextViewer(fShell, SWT.NONE);
 		textViewer.setDocument(new Document(
 				"/**\n"

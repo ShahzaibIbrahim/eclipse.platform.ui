@@ -17,6 +17,7 @@ package org.eclipse.ui.internal.findandreplace;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -53,6 +54,22 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	private boolean isTargetSupportingRegEx;
 	private boolean isTargetEditable;
 	private Set<SearchOptions> searchOptions = new HashSet<>();
+
+	private String findString = ""; //$NON-NLS-1$
+	private String replaceString = ""; //$NON-NLS-1$
+
+	@Override
+	public void setFindString(String findString) {
+		this.findString = Objects.requireNonNull(findString);
+		if (isAvailableAndActive(SearchOptions.INCREMENTAL)) {
+			performSearch(true);
+		}
+	}
+
+	@Override
+	public void setReplaceString(String replaceString) {
+		this.replaceString = Objects.requireNonNull(replaceString);
+	}
 
 	@Override
 	public void activate(SearchOptions searchOption) {
@@ -113,14 +130,28 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	}
 
 	@Override
-	public boolean isIncrementalSearchAvailable() {
-		return !isRegExSearchAvailableAndActive();
+	public boolean isAvailable(SearchOptions searchOption) {
+		switch (searchOption) {
+		case INCREMENTAL:
+			return !isAvailableAndActive(SearchOptions.REGEX);
+		case REGEX:
+			return isTargetSupportingRegEx;
+		case WHOLE_WORD:
+			return !isAvailableAndActive(SearchOptions.REGEX) && isWord(findString);
+		case CASE_SENSITIVE:
+		case FORWARD:
+		case GLOBAL:
+		case WRAP:
+		default:
+			return true;
+		}
 	}
 
 	@Override
-	public boolean isWholeWordSearchAvailable(String findString) {
-		return !isRegExSearchAvailableAndActive() && isWord(findString);
+	public boolean isAvailableAndActive(SearchOptions searchOption) {
+		return isAvailable(searchOption) && isActive(searchOption);
 	}
+
 	/**
 	 * Tests whether each character in the given string is a letter.
 	 *
@@ -129,11 +160,6 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	 */
 	private static boolean isWord(String str) {
 		return str != null && str.chars().allMatch(Character::isJavaIdentifierPart);
-	}
-
-	@Override
-	public boolean isRegExSearchAvailableAndActive() {
-		return isActive(SearchOptions.REGEX) && isTargetSupportingRegEx;
 	}
 
 	@Override
@@ -168,7 +194,8 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 		Point lineSelection = extensionTarget.getLineSelection();
 		scope = new Region(lineSelection.x, lineSelection.y);
 
-		int offset = isActive(SearchOptions.FORWARD) ? scope.getOffset() : scope.getOffset() + scope.getLength();
+		int offset = isAvailableAndActive(SearchOptions.FORWARD) ? scope.getOffset()
+				: scope.getOffset() + scope.getLength();
 
 		extensionTarget.setSelection(offset, 0);
 		extensionTarget.setScope(scope);
@@ -213,12 +240,12 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	}
 
 	@Override
-	public void performReplaceAll(String findString, String replaceString) {
+	public void performReplaceAll() {
 		resetStatus();
 
 		if (findString != null && !findString.isEmpty()) {
 			try {
-				int replaceCount = replaceAll(findString, replaceString == null ? "" : replaceString); //$NON-NLS-1$
+				int replaceCount = replaceAll();
 				if (replaceCount != 0) {
 					if (replaceCount == 1) { // not plural
 						statusLineMessage(FindReplaceMessages.FindReplace_Status_replacement_label);
@@ -243,12 +270,12 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	}
 
 	@Override
-	public void performSelectAll(String findString) {
+	public void performSelectAll() {
 		resetStatus();
 
 		if (findString != null && !findString.isEmpty()) {
 			try {
-				int selectCount = selectAll(findString);
+				int selectCount = selectAll();
 				if (selectCount != 0) {
 					if (selectCount == 1) { // not plural
 						statusLineMessage(FindReplaceMessages.FindReplace_Status_selection_label);
@@ -293,59 +320,26 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 		return isEditable();
 	}
 
-	/**
-	 * Replaces the current selection of the target with the user's replace string.
-	 *
-	 * @param replaceString the String to replace the selection with
-	 *
-	 * @return <code>true</code> if the operation was successful
-	 */
-	private boolean replaceSelection(String replaceString) {
+	@Override
+	public boolean performSearch() {
+		boolean result = performSearch(false);
+		resetIncrementalBaseLocation();
+		return result;
+	}
 
-		if (!prepareTargetForEditing()) {
+	private boolean performSearch(boolean updateFromIncrementalBaseLocation) {
+		resetStatus();
+		if (findString.isEmpty()) {
 			return false;
 		}
 
-		if (replaceString == null) {
-			replaceString = ""; //$NON-NLS-1$
-		}
-
-		boolean replaced;
+		boolean somethingFound = false;
 		try {
-			replaceSelection(replaceString, isRegExSearchAvailableAndActive());
-			replaced = true;
+			return somethingFound = findNext(updateFromIncrementalBaseLocation);
 		} catch (PatternSyntaxException ex) {
 			status = new InvalidRegExStatus(ex);
-			replaced = false;
 		} catch (IllegalStateException ex) {
-			replaced = false;
-		}
-
-		return replaced;
-	}
-
-	@Override
-	public boolean performSearch(String findString) {
-		return performSearch(findString, true);
-	}
-
-	private boolean performSearch(String findString, boolean validateSearchOptions) {
-		resetStatus();
-
-		if (validateSearchOptions && (isActive(SearchOptions.INCREMENTAL) && !isIncrementalSearchAvailable())) {
-			return false; // Do nothing if search options are not compatible
-		}
-		boolean somethingFound = false;
-
-		if (findString != null && !findString.isEmpty()) {
-
-			try {
-				somethingFound = findNext(findString);
-			} catch (PatternSyntaxException ex) {
-				status = new InvalidRegExStatus(ex);
-			} catch (IllegalStateException ex) {
-				// we don't keep state in this dialog
-			}
+			// we don't keep state in this dialog
 		}
 		return somethingFound;
 	}
@@ -354,13 +348,10 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	 * Replaces all occurrences of the user's findString with the replace string.
 	 * Returns the number of replacements that occur.
 	 *
-	 * @param findString    the string to search for
-	 * @param replaceString the replacement string
-	 *                      expression
 	 * @return the number of occurrences
 	 *
 	 */
-	private int replaceAll(String findString, String replaceString) {
+	private int replaceAll() {
 		if (!prepareTargetForEditing()) {
 			return 0;
 		}
@@ -369,8 +360,8 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 		executeInForwardMode(() -> {
 			executeWithReplaceAllEnabled(() -> {
 				Point currentSelection = new Point(0, 0);
-				while (findAndSelect(currentSelection.x + currentSelection.y, findString) != -1) {
-					currentSelection = replaceSelection(replaceString, isRegExSearchAvailableAndActive());
+				while (findAndSelect(currentSelection.x + currentSelection.y) != -1) {
+					currentSelection = replaceSelection();
 					replacements.add(currentSelection);
 				}
 			});
@@ -405,14 +396,13 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	}
 
 	/**
-	 * @param findString the string to select as part of the search
 	 * @return the number of selected elements
 	 */
-	private int selectAll(String findString) {
+	private int selectAll() {
 		List<Point> selections = new ArrayList<>();
 		executeInForwardMode(() -> {
 			Point currentSeletion = new Point(0, 0);
-			while (findAndSelect(currentSeletion.x + currentSeletion.y, findString) != -1) {
+			while (findAndSelect(currentSeletion.x + currentSeletion.y) != -1) {
 				currentSeletion = target.getSelection();
 				selections.add(currentSeletion);
 			}
@@ -429,26 +419,25 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	 * Returns the position of the specified search string, or <code>-1</code> if
 	 * the string can not be found when searching using the given options.
 	 *
-	 * @param findString    the string to search for
 	 * @param startPosition the position at which to start the search
 	 * @return the occurrence of the find string following the options or
 	 *         <code>-1</code> if nothing found
 	 */
-	private int findIndex(String findString, int startPosition) {
+	private int findIndex(int startPosition) {
 		int index = 0;
-		if (isActive(SearchOptions.FORWARD)) {
-			index = findAndSelect(startPosition, findString);
+		if (isAvailableAndActive(SearchOptions.FORWARD)) {
+			index = findAndSelect(startPosition);
 		} else {
 			index = startPosition == 0 ? -1
-				: findAndSelect(startPosition - 1, findString);
+					: findAndSelect(startPosition - 1);
 		}
 
 		if (index == -1) {
 
-			if (isActive(SearchOptions.WRAP)) {
+			if (isAvailableAndActive(SearchOptions.WRAP)) {
 				statusLineMessage(FindReplaceMessages.FindReplace_Status_wrapped_label);
 				status = new FindStatus(FindStatus.StatusCode.WRAPPED);
-				index = findAndSelect(-1, findString);
+				index = findAndSelect(-1);
 			} else {
 				status = new FindStatus(FindStatus.StatusCode.NO_MATCH);
 			}
@@ -457,11 +446,11 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	}
 
 	@Override
-	public int findAndSelect(int offset, String findString) {
-		boolean wholeWordSearch = isActive(SearchOptions.WHOLE_WORD) && isWholeWordSearchAvailable(findString);
-		boolean forwardSearch = isActive(SearchOptions.FORWARD);
-		boolean caseSensitiveSearch = isActive(SearchOptions.CASE_SENSITIVE);
-		boolean regexSearch = isActive(SearchOptions.REGEX);
+	public int findAndSelect(int offset) {
+		boolean wholeWordSearch = isAvailableAndActive(SearchOptions.WHOLE_WORD);
+		boolean forwardSearch = isAvailableAndActive(SearchOptions.FORWARD);
+		boolean caseSensitiveSearch = isAvailableAndActive(SearchOptions.CASE_SENSITIVE);
+		boolean regexSearch = isAvailableAndActive(SearchOptions.REGEX);
 
 		if (target instanceof IFindReplaceTargetExtension3 regexSupportingTarget) {
 			return (regexSupportingTarget).findAndSelect(offset, findString,
@@ -473,44 +462,33 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 	}
 
 	/**
-	 * Replaces the selection with <code>replaceString</code>. If
-	 * <code>regExReplace</code> is <code>true</code>, <code>replaceString</code> is
-	 * a regex replace pattern which will get expanded if the underlying target
-	 * supports it. Returns the region of the inserted text; note that the returned
-	 * selection covers the expanded pattern in case of regex replace.
+	 * Replaces the selection with the current replace string. If the regex search
+	 * option has been activated, the replace string is considered as regex replace
+	 * pattern which will get expanded if the underlying target supports it. Returns
+	 * the region of the inserted text; note that the returned selection covers the
+	 * expanded pattern in case of regex replace.
 	 *
-	 * @param replaceString the replace string (or a regex pattern)
-	 * @param regExReplace  <code>true</code> if <code>replaceString</code> is a
-	 *                      pattern
 	 * @return the selection after replacing, i.e. the inserted text
 	 */
-	private Point replaceSelection(String replaceString, boolean regExReplace) {
+	private Point replaceSelection() {
 		if (target instanceof IFindReplaceTargetExtension3)
-			((IFindReplaceTargetExtension3) target).replaceSelection(replaceString, regExReplace);
+			((IFindReplaceTargetExtension3) target).replaceSelection(replaceString,
+					isAvailableAndActive(SearchOptions.REGEX));
 		else
 			target.replaceSelection(replaceString);
 
 		return target.getSelection();
 	}
 
-	/**
-	 * Returns whether the specified search string can be found using the given
-	 * options.
-	 *
-	 * @param findString             the string to search for
-	 * @return <code>true</code> if the search string can be found using the given
-	 *         options
-	 *
-	 */
-	private boolean findNext(String findString) {
+	private boolean findNext(boolean updateFromIncrementalBaseLocation) {
 
 		if (target == null) {
 			return false;
 		}
 
-		int findReplacePosition = calculateFindBeginningOffset();
+		int findReplacePosition = calculateFindBeginningOffset(updateFromIncrementalBaseLocation);
 
-		int index = findIndex(findString, findReplacePosition);
+		int index = findIndex(findReplacePosition);
 
 		if (index == -1) {
 			String msg = NLSUtility.format(FindReplaceMessages.FindReplace_Status_noMatchWithValue_label, findString);
@@ -527,55 +505,73 @@ public class FindReplaceLogic implements IFindReplaceLogic {
 		return true;
 	}
 
-	private int calculateFindBeginningOffset() {
+	private int calculateFindBeginningOffset(boolean updateFromExistingBaseLocation) {
 		Point r = null;
-		if (isActive(SearchOptions.INCREMENTAL)) {
+		if (updateFromExistingBaseLocation) {
 			r = incrementalBaseLocation;
 		} else {
 			r = target.getSelection();
 		}
 
 		int findReplacePosition = r.x;
-		if (isActive(SearchOptions.FORWARD) && !isActive(SearchOptions.INCREMENTAL)
-				|| isActive(SearchOptions.INCREMENTAL) && !isActive(SearchOptions.FORWARD)) {
+		if (!isActive(SearchOptions.FORWARD)) {
 			findReplacePosition += r.y;
+		}
+		if (!updateFromExistingBaseLocation) {
+			if (isActive(SearchOptions.FORWARD)) {
+				findReplacePosition += r.y;
+			} else {
+				findReplacePosition -= r.y;
+			}
 		}
 		return findReplacePosition;
 	}
 
 	@Override
-	public boolean performReplaceAndFind(String findString, String replaceString) {
+	public boolean performReplaceAndFind() {
 		resetStatus();
-		if (performSelectAndReplace(findString, replaceString)) {
-			performSearch(findString, false);
+		if (performSelectAndReplace()) {
+			performSearch();
 			return true;
 		}
 		return false;
 	}
 
 	@Override
-	public boolean performSelectAndReplace(String findString, String replaceString) {
+	public boolean performSelectAndReplace() {
 		resetStatus();
-		if (!isFindStringSelected(findString)) {
-			performSearch(findString, false);
+		if (!isFindStringSelected()) {
+			performSearch();
 		}
 		if (getStatus().wasSuccessful()) {
-			return replaceSelection(replaceString);
+			if (!prepareTargetForEditing()) {
+				return false;
+			}
+			try {
+				replaceSelection();
+				return true;
+			} catch (PatternSyntaxException ex) {
+				status = new InvalidRegExStatus(ex);
+			} catch (IllegalStateException ex) {
+			}
 		}
 		return false;
 	}
 
-	private boolean isFindStringSelected(String findString) {
+	private boolean isFindStringSelected() {
 		String selectedString = getCurrentSelection();
-		if (isRegExSearchAvailableAndActive()) {
+		if (isAvailableAndActive(SearchOptions.REGEX)) {
 			int patternFlags = 0;
-			if (!isActive(SearchOptions.CASE_SENSITIVE)) {
+			if (!isAvailableAndActive(SearchOptions.CASE_SENSITIVE)) {
 				patternFlags |= Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
 			}
 			Pattern pattern = Pattern.compile(findString, patternFlags);
 			return pattern.matcher(selectedString).find();
 		} else {
-			return getCurrentSelection().equals(findString);
+			if (isAvailableAndActive(SearchOptions.CASE_SENSITIVE)) {
+				return getCurrentSelection().equals(findString);
+			}
+			return getCurrentSelection().equalsIgnoreCase(findString);
 		}
 	}
 

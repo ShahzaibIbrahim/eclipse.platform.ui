@@ -13,22 +13,19 @@
  *******************************************************************************/
 package org.eclipse.ui.internal.findandreplace;
 
-import static org.eclipse.ui.internal.findandreplace.FindReplaceTestUtil.runEventQueue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 
 import java.util.ResourceBundle;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 
 import org.eclipse.swt.SWT;
-
-import org.eclipse.jface.util.Util;
 
 import org.eclipse.jface.text.Document;
 import org.eclipse.jface.text.IFindReplaceTarget;
@@ -36,8 +33,6 @@ import org.eclipse.jface.text.TextSelection;
 import org.eclipse.jface.text.TextViewer;
 
 import org.eclipse.ui.PlatformUI;
-
-import org.eclipse.ui.workbench.texteditor.tests.ScreenshotTest;
 
 import org.eclipse.ui.texteditor.FindReplaceAction;
 
@@ -50,6 +45,11 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 	private FindReplaceAction findReplaceAction;
 
 	private AccessType dialog;
+
+	@Before
+	public final void ensureWorkbenchWindowIsActive() {
+		PlatformUI.getWorkbench().getWorkbenchWindows()[0].getShell().forceActive();
+	}
 
 	protected FindReplaceAction getFindReplaceAction() {
 		return findReplaceAction;
@@ -76,16 +76,6 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 	protected void reopenFindReplaceUIForTextViewer() {
 		dialog.close();
 		dialog= openUIFromTextViewer(fTextViewer);
-	}
-
-	protected final void ensureHasFocusOnGTK() {
-		if (Util.isGtk()) {
-			runEventQueue();
-			if (dialog.getActiveShell() == null) {
-				String screenshotPath= ScreenshotTest.takeScreenshot(FindReplaceUITest.class, testName.getMethodName(), System.out);
-				fail("this test does not work on GTK unless the runtime workbench has focus. Screenshot: " + screenshotPath);
-			}
-		}
 	}
 
 	protected abstract AccessType openUIFromTextViewer(TextViewer viewer);
@@ -119,7 +109,6 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 		dialog.assertEnabled(SearchOptions.REGEX);
 		dialog.assertEnabled(SearchOptions.WHOLE_WORD);
 
-		dialog.getFindReplaceLogic().updateTarget(fTextViewer.getFindReplaceTarget(), false);
 		dialog.select(SearchOptions.WHOLE_WORD);
 		dialog.select(SearchOptions.REGEX);
 		dialog.assertEnabled(SearchOptions.REGEX);
@@ -160,8 +149,7 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 
 		dialog.select(SearchOptions.INCREMENTAL);
 		dialog.setFindText("line");
-		ensureHasFocusOnGTK();
-		IFindReplaceTarget target= dialog.getTarget();
+		IFindReplaceTarget target= getFindReplaceTarget();
 
 		assertEquals(0, (target.getSelection()).x);
 		assertEquals(4, (target.getSelection()).y);
@@ -190,7 +178,7 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 		dialog.select(SearchOptions.INCREMENTAL);
 
 		dialog.setFindText("lin");
-		IFindReplaceTarget target= dialog.getTarget();
+		IFindReplaceTarget target= getFindReplaceTarget();
 		assertEquals(0, (target.getSelection()).x);
 		assertEquals(dialog.getFindText().length(), (target.getSelection()).y);
 
@@ -206,7 +194,7 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 		dialog.select(SearchOptions.WHOLE_WORD);
 		dialog.select(SearchOptions.WRAP);
 		dialog.setFindText("two");
-		IFindReplaceTarget target= dialog.getTarget();
+		IFindReplaceTarget target= getFindReplaceTarget();
 		assertEquals(0, (target.getSelection()).x);
 		assertEquals(3, (target.getSelection()).y);
 
@@ -227,7 +215,7 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 		dialog.select(SearchOptions.REGEX);
 		dialog.setFindText("(a|bc)");
 
-		IFindReplaceTarget target= dialog.getTarget();
+		IFindReplaceTarget target= getFindReplaceTarget();
 		dialog.simulateKeyboardInteractionInFindInputField(SWT.CR, false);
 		assertEquals(0, (target.getSelection()).x);
 		assertEquals(1, (target.getSelection()).y);
@@ -341,6 +329,18 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 	}
 
 	@Test
+	public void testActivateDialogSelectionActive_withoutRegExOptionActivated() {
+		openTextViewer("test text.*;");
+		initializeFindReplaceUIForTextViewer();
+
+		fTextViewer.setSelection(new TextSelection("test ".length(), "text.*".length()));
+		reopenFindReplaceUIForTextViewer();
+
+		dialog.assertUnselected(SearchOptions.REGEX);
+		assertEquals("text.*", dialog.getFindText());
+	}
+
+	@Test
 	public void testActivateDialogSelectionActive_withRegExOptionActivated() {
 		openTextViewer("test text.*;");
 		initializeFindReplaceUIForTextViewer();
@@ -372,6 +372,10 @@ public abstract class FindReplaceUITest<AccessType extends IFindReplaceUIAccess>
 
 	protected TextViewer getTextViewer() {
 		return fTextViewer;
+	}
+
+	protected final IFindReplaceTarget getFindReplaceTarget() {
+		return fTextViewer.getFindReplaceTarget();
 	}
 
 }
