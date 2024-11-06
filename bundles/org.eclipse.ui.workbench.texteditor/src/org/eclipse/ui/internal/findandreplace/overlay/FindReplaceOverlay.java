@@ -33,6 +33,7 @@ import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
@@ -71,6 +72,7 @@ import org.eclipse.ui.internal.findandreplace.status.IFindReplaceStatus;
 import org.eclipse.ui.internal.texteditor.TextEditorPlugin;
 
 import org.eclipse.ui.texteditor.AbstractTextEditor;
+import org.eclipse.ui.texteditor.FindReplaceAction;
 import org.eclipse.ui.texteditor.IAbstractTextEditorHelpContextIds;
 import org.eclipse.ui.texteditor.ITextEditorActionDefinitionIds;
 import org.eclipse.ui.texteditor.StatusTextEditor;
@@ -202,7 +204,7 @@ public class FindReplaceOverlay {
 			.controlResizedAdapter(__ -> asyncExecIfOpen(FindReplaceOverlay.this::updatePlacementAndVisibility));
 
 	private void asyncExecIfOpen(Runnable operation) {
-		if (!containerControl.isDisposed() && containerControl.isVisible()) {
+		if (!containerControl.isDisposed()) {
 			containerControl.getDisplay().asyncExec(() -> {
 				if (containerControl != null || containerControl.isDisposed()) {
 					operation.run();
@@ -228,10 +230,13 @@ public class FindReplaceOverlay {
 	 *
 	 * @return the dialog settings to be used
 	 */
-	private static IDialogSettings getDialogSettings() {
+	private IDialogSettings getDialogSettings() {
 		IDialogSettings settings = PlatformUI
-				.getDialogSettingsProvider(FrameworkUtil.getBundle(FindReplaceOverlay.class)).getDialogSettings();
-		return settings;
+				.getDialogSettingsProvider(FrameworkUtil.getBundle(FindReplaceAction.class)).getDialogSettings();
+		IDialogSettings dialogSettings = settings.getSection(FindReplaceAction.class.getClass().getName());
+		if (dialogSettings == null)
+			dialogSettings = settings.addNewSection(FindReplaceAction.class.getClass().getName());
+		return dialogSettings;
 	}
 
 	public void close() {
@@ -542,8 +547,7 @@ public class FindReplaceOverlay {
 		searchBarContainer = new Composite(searchContainer, SWT.NONE);
 		GridDataFactory.fillDefaults().grab(true, true).align(GridData.FILL, GridData.FILL).applyTo(searchBarContainer);
 		GridLayoutFactory.fillDefaults().numColumns(1).applyTo(searchBarContainer);
-
-		HistoryStore searchHistory = new HistoryStore(getDialogSettings(), "searchhistory", //$NON-NLS-1$
+		HistoryStore searchHistory = new HistoryStore(getDialogSettings(), "findhistory", //$NON-NLS-1$
 				HISTORY_SIZE);
 		searchBar = new HistoryTextWrapper(searchHistory, searchBarContainer, SWT.SINGLE);
 		searchBarDecoration = new ControlDecoration(searchBar, SWT.BOTTOM | SWT.LEFT);
@@ -692,9 +696,10 @@ public class FindReplaceOverlay {
 		if (!okayToUse(replaceToggle)) {
 			return;
 		}
-		boolean visible = enable && findReplaceLogic.getTarget().isEditable();
-		((GridData) replaceToggleTools.getLayoutData()).exclude = !visible;
-		replaceToggleTools.setVisible(visible);
+		boolean shouldBeVisible = enable && findReplaceLogic.getTarget().isEditable();
+		((GridLayout) containerControl.getLayout()).numColumns = shouldBeVisible ? 2 : 1;
+		((GridData) replaceToggleTools.getLayoutData()).exclude = !shouldBeVisible;
+		replaceToggleTools.setVisible(shouldBeVisible);
 	}
 
 	private void enableReplaceTools(boolean enable) {
