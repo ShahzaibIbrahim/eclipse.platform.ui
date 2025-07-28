@@ -1554,7 +1554,15 @@ public class FormText extends Canvas {
 		ensureBoldFontPresent(getFont());
 		gc.setForeground(getForeground());
 		gc.setBackground(getBackground());
-		repaint(gc, e.x, e.y, e.width, e.height);
+		Point size = getSize();
+		Rectangle paintBounds;
+		if (size.x == 0 && size.y == 0) {
+			// avoids crash on image creation with (0,0) image size
+			paintBounds = new Rectangle(e.x, e.y, e.width, e.height);
+		} else {
+			paintBounds = new Rectangle(0, 0, size.x, size.y);
+		}
+		repaint(gc, paintBounds.x, paintBounds.y, paintBounds.width, paintBounds.height);
 	}
 
 	private void repaint(GC gc, int x, int y, int width, int height) {

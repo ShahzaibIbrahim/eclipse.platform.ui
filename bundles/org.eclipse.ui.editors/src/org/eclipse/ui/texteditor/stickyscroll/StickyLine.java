@@ -47,7 +47,11 @@ public class StickyLine implements IStickyLine {
 	public String getText() {
 		if (text == null) {
 			StyledText textWidget = sourceViewer.getTextWidget();
-			text = textWidget.getLine(getWidgetLineNumber());
+			int widgetLineNumber = getWidgetLineNumber();
+			if (widgetLineNumber < 0 || widgetLineNumber >= textWidget.getLineCount()) {
+				return ""; // return empty string if line number is invalid //$NON-NLS-1$
+			}
+			text = textWidget.getLine(widgetLineNumber);
 		}
 		return text;
 	}
@@ -57,16 +61,19 @@ public class StickyLine implements IStickyLine {
 		StyledText textWidget = sourceViewer.getTextWidget();
 		int widgetLineNumber = getWidgetLineNumber();
 
-		if (widgetLineNumber >= textWidget.getLineCount()) {
+		if (widgetLineNumber < 0 || widgetLineNumber >= textWidget.getLineCount()) {
 			return null;
 		}
-
-		int offsetAtLine = textWidget.getOffsetAtLine(getWidgetLineNumber());
-		StyleRange[] styleRanges = textWidget.getStyleRanges(offsetAtLine, getText().length());
-		for (StyleRange styleRange : styleRanges) {
-			styleRange.start = styleRange.start - offsetAtLine;
+		try {
+			int offsetAtLine = textWidget.getOffsetAtLine(widgetLineNumber);
+			StyleRange[] styleRanges = textWidget.getStyleRanges(offsetAtLine, getText().length());
+			for (StyleRange styleRange : styleRanges) {
+				styleRange.start = styleRange.start - offsetAtLine;
+			}
+			return styleRanges;
+		} catch (IllegalArgumentException e) {
+			return null; // in case of an invalid line number, return null
 		}
-		return styleRanges;
 	}
 
 	private int getWidgetLineNumber() {

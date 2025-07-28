@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2007 IBM Corporation and others.
+ * Copyright (c) 2007, 2025 IBM Corporation and others.
  *
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
@@ -16,16 +16,21 @@ package org.eclipse.core.tests.databinding;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.eclipse.core.databinding.UpdateValueStrategy;
 import org.eclipse.core.databinding.conversion.IConverter;
 import org.eclipse.core.databinding.conversion.text.NumberToStringConverter;
 import org.eclipse.core.databinding.conversion.text.StringToNumberConverter;
+import org.eclipse.core.databinding.observable.value.AbstractObservableValue;
 import org.eclipse.core.databinding.observable.value.IObservableValue;
 import org.eclipse.core.databinding.observable.value.WritableValue;
 import org.eclipse.core.internal.databinding.conversion.DateToStringConverter;
@@ -353,5 +358,40 @@ public class UpdateStrategyTest extends AbstractDefaultRealmTestCase {
 			this.conv = converter;
 			return super.setConverter(converter);
 		}
+	}
+
+	@Test
+	public void testDefaultConverterWithTypeErasure() {
+		WritableValue<Set<?>> source = WritableValue.withValueType(Set.class);
+		WritableValue<List<?>> destination = WritableValue.withValueType(List.class);
+
+		UpdateStrategyStub<Set<?>, List<?>> strategy = new UpdateStrategyStub<>();
+		strategy.fillDefaults(source, destination);
+
+		RuntimeException ex = assertThrows(RuntimeException.class, () -> strategy.convert(new HashSet<>()));
+		assertTrue("Type erasure was missed", ex.getCause() instanceof ClassCastException);
+	}
+
+	// https://github.com/eclipse-platform/eclipse.platform.ui/pull/3009#issuecomment-3012956414
+	@Test
+	public void testDefaultConverterWithPrimitiveTypeAsDestinationAndNonClassTypeAsSourceType() {
+		IObservableValue<Boolean> source = new AbstractObservableValue() {
+			@Override
+			public Object getValueType() {
+				return new Object(); // non-class type, happens e.g. in EMF databinding
+			}
+
+			@Override
+			protected Object doGetValue() {
+				return Boolean.TRUE;
+			}
+		};
+		WritableValue<Boolean> destination = WritableValue.withValueType(boolean.class);
+
+		UpdateStrategyStub<Object, Boolean> strategy = new UpdateStrategyStub<>();
+		strategy.fillDefaults(source, destination);
+
+		Boolean result = strategy.convert(source.getValue());
+		assertTrue(result);
 	}
 }

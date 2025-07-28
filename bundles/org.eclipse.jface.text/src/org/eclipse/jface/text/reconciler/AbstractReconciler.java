@@ -16,6 +16,8 @@ package org.eclipse.jface.text.reconciler;
 import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
 
 import org.eclipse.jface.text.DocumentEvent;
 import org.eclipse.jface.text.IDocument;
@@ -53,27 +55,27 @@ abstract public class AbstractReconciler implements IReconciler {
 	/**
 	 * Background thread for the reconciling activity.
 	 */
-	class BackgroundThread extends Thread {
+	class BackgroundWorker implements Runnable {
 
 		/** Has the reconciler been canceled. */
-		private boolean fCanceled= false;
+		private boolean fCanceled;
 		/** Has the reconciler been reset. */
-		private boolean fReset= false;
+		private boolean fReset;
 		/** Some changes need to be processed. */
-		private boolean fIsDirty= false;
+		private boolean fIsDirty;
 		/** Is a reconciling strategy active. */
-		private boolean fIsActive= false;
+		private boolean fIsActive;
 
-		/**
-		 * Creates a new background thread. The thread
-		 * runs with minimal priority.
-		 *
-		 * @param name the thread's name
-		 */
-		public BackgroundThread(String name) {
-			super(name);
-			setPriority(Thread.MIN_PRIORITY);
-			setDaemon(true);
+		private boolean fStarted;
+
+		private String fName;
+
+		private boolean fIsAlive;
+
+		private volatile Thread fThread;
+
+		public BackgroundWorker(String name) {
+			fName= name;
 		}
 
 		/**
@@ -162,61 +164,91 @@ abstract public class AbstractReconciler implements IReconciler {
 		 * The background activity. Waits until there is something in the
 		 * queue managing the changes that have been applied to the text viewer.
 		 * Removes the first change from the queue and process it.
-		 * <p>
-		 * Calls {@link AbstractReconciler#initialProcess()} on entrance.
-		 * </p>
 		 */
 		@Override
 		public void run() {
+			try {
+				while (!fCanceled) {
 
-			delay();
+					delay();
 
-			if (fCanceled)
-				return;
+					if (fCanceled)
+						break;
 
-			initialProcess();
-
-			while (!fCanceled) {
-
-				delay();
-
-				if (fCanceled)
-					break;
-
-				if (!isDirty()) {
-					waitFinish= false; //signalWaitForFinish() was called but nothing todo
-					continue;
-				}
-
-				synchronized (this) {
-					if (fReset) {
-						fReset= false;
+					if (!isDirty()) {
+						waitFinish= false; //signalWaitForFinish() was called but nothing todo
 						continue;
 					}
-				}
 
-				DirtyRegion r= null;
-				synchronized (fDirtyRegionQueue) {
-					r= fDirtyRegionQueue.removeNextDirtyRegion();
-				}
-
-				fIsActive= true;
-
-				fProgressMonitor.setCanceled(false);
-
-				process(r);
-
-				synchronized (fDirtyRegionQueue) {
-					if (0 == fDirtyRegionQueue.getSize()) {
-						synchronized (this) {
-							fIsDirty= fProgressMonitor.isCanceled();
+					synchronized (this) {
+						if (fReset) {
+							fReset= false;
+							continue;
 						}
-						fDirtyRegionQueue.notifyAll();
 					}
-				}
 
-				fIsActive= false;
+					DirtyRegion r= null;
+					synchronized (fDirtyRegionQueue) {
+						r= fDirtyRegionQueue.removeNextDirtyRegion();
+					}
+
+					fIsActive= true;
+
+					fProgressMonitor.setCanceled(false);
+
+					process(r);
+
+					synchronized (fDirtyRegionQueue) {
+						if (fDirtyRegionQueue.isEmpty()) {
+							synchronized (this) {
+								fIsDirty= fProgressMonitor.isCanceled();
+							}
+							fDirtyRegionQueue.notifyAll();
+						}
+					}
+					fIsActive= false;
+				}
+			} finally {
+				fIsAlive= false;
 			}
+		}
+
+		boolean isAlive() {
+			return fIsAlive;
+		}
+
+		/**
+		 * Star the reconciling if not running (and calls
+		 * {@link AbstractReconciler#initialProcess()}) or {@link #reset()} otherwise.
+		 */
+		public void startReconciling() {
+			if (!fStarted) {
+				fIsAlive= true;
+				fStarted= true;
+				Job.createSystem("Delayed Reconciler startup for " + fName, m -> { //$NON-NLS-1$
+					//Until we process some code from the job, the reconciler thread is the current thread
+					fThread= Thread.currentThread();
+					delay();
+					if (fCanceled) {
+						return Status.CANCEL_STATUS;
+					}
+					initialProcess();
+					if (fCanceled) {
+						return Status.CANCEL_STATUS;
+					}
+					Thread thread= new Thread(this);
+					thread.setName(fName);
+					thread.setPriority(Thread.MIN_PRIORITY);
+					thread.setDaemon(true);
+					//we will no longer process any code here, so hand over to the worker thread.
+					fThread= thread;
+					thread.start();
+					return Status.OK_STATUS;
+				}).schedule();
+			} else {
+				reset();
+			}
+
 		}
 	}
 
@@ -232,8 +264,8 @@ abstract public class AbstractReconciler implements IReconciler {
 		@Override
 		public void documentChanged(DocumentEvent e) {
 
-			if (fThread.isActive() || !fThread.isDirty() && fThread.isAlive()) {
-				if (!fIsAllowedToModifyDocument && Thread.currentThread() == fThread)
+			if (fWorker.isActive() || !fWorker.isDirty() && fWorker.isAlive()) {
+				if (!fIsAllowedToModifyDocument && isRunningInReconcilerThread())
 					throw new UnsupportedOperationException("The reconciler thread is not allowed to modify the document"); //$NON-NLS-1$
 				aboutToBeReconciledInternal();
 			}
@@ -242,13 +274,13 @@ abstract public class AbstractReconciler implements IReconciler {
 			 * The second OR condition handles the case when the document
 			 * gets changed while still inside initialProcess().
 			 */
-			if (fThread.isActive() || fThread.isDirty() && fThread.isAlive())
+			if (fWorker.isActive() || fWorker.isDirty() && fWorker.isAlive())
 				fProgressMonitor.setCanceled(true);
 
 			if (fIsIncrementalReconciler)
 				createDirtyRegion(e);
 
-			fThread.reset();
+			fWorker.reset();
 
 		}
 
@@ -264,11 +296,11 @@ abstract public class AbstractReconciler implements IReconciler {
 					synchronized (fDirtyRegionQueue) {
 						fDirtyRegionQueue.purgeQueue();
 					}
-					if (fDocument != null && fDocument.getLength() > 0 && fThread.isDirty() && fThread.isAlive()) {
+					if (fDocument != null && fDocument.getLength() > 0 && fWorker.isDirty() && fWorker.isAlive()) {
 						DocumentEvent e= new DocumentEvent(fDocument, 0, fDocument.getLength(), ""); //$NON-NLS-1$
 						createDirtyRegion(e);
-						fThread.reset();
-						fThread.suspendCallerWhileDirty();
+						fWorker.reset();
+						fWorker.suspendCallerWhileDirty();
 					}
 				}
 
@@ -288,7 +320,7 @@ abstract public class AbstractReconciler implements IReconciler {
 
 			fDocument.addDocumentListener(this);
 
-			if (!fThread.isDirty())
+			if (!fWorker.isDirty())
 				aboutToBeReconciledInternal();
 
 			startReconciling();
@@ -298,7 +330,7 @@ abstract public class AbstractReconciler implements IReconciler {
 	/** Queue to manage the changes applied to the text viewer. */
 	private DirtyRegionQueue fDirtyRegionQueue;
 	/** The background thread. */
-	private BackgroundThread fThread;
+	private BackgroundWorker fWorker;
 	/** Internal document and text input listener. */
 	private Listener fListener;
 	/** The background thread delay. */
@@ -447,9 +479,9 @@ abstract public class AbstractReconciler implements IReconciler {
 		fViewer= textViewer;
 
 		synchronized (this) {
-			if (fThread != null)
+			if (fWorker != null)
 				return;
-			fThread= new BackgroundThread(getClass().getName());
+			fWorker= new BackgroundWorker(getClass().getName());
 		}
 
 		fDirtyRegionQueue= new DirtyRegionQueue();
@@ -483,8 +515,8 @@ abstract public class AbstractReconciler implements IReconciler {
 
 			synchronized (this) {
 				// http://dev.eclipse.org/bugs/show_bug.cgi?id=19135
-				BackgroundThread bt= fThread;
-				fThread= null;
+				BackgroundWorker bt= fWorker;
+				fWorker= null;
 				bt.cancel();
 			}
 		}
@@ -590,10 +622,10 @@ abstract public class AbstractReconciler implements IReconciler {
 
 		if (fDocument != null) {
 
-			if (!fThread.isDirty()&& fThread.isAlive())
+			if (!fWorker.isDirty()&& fWorker.isAlive())
 				aboutToBeReconciledInternal();
 
-			if (fThread.isActive())
+			if (fWorker.isActive())
 				fProgressMonitor.setCanceled(true);
 
 			if (fIsIncrementalReconciler) {
@@ -610,21 +642,10 @@ abstract public class AbstractReconciler implements IReconciler {
 	 * Clients may extend this method.
 	 */
 	protected synchronized void startReconciling() {
-		if (fThread == null)
+		if (fWorker == null)
 			return;
 
-		if (!fThread.isAlive()) {
-			try {
-				fThread.start();
-			} catch (IllegalThreadStateException e) {
-				// see https://bugs.eclipse.org/bugs/show_bug.cgi?id=40549
-				// This is the only instance where the thread is started; since
-				// we checked that it is not alive, it must be dead already due
-				// to a run-time exception or error. Exit.
-			}
-		} else {
-			fThread.reset();
-		}
+		fWorker.startReconciling();
 	}
 
 	/**
@@ -640,7 +661,9 @@ abstract public class AbstractReconciler implements IReconciler {
 	 * @return <code>true</code> if running in this reconciler's background thread
 	 * @since 3.4
 	 */
-	protected boolean isRunningInReconcilerThread() {
-		return Thread.currentThread() == fThread;
+	protected synchronized boolean isRunningInReconcilerThread() {
+		if (fWorker == null)
+			return false;
+		return Thread.currentThread() == fWorker.fThread;
 	}
 }

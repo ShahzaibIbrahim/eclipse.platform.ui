@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2013, 2014 IBM Corporation and others.
+ * Copyright (c) 2025 IBM Corporation and others.
  *
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
@@ -10,19 +10,22 @@
  *
  * Contributors:
  *     IBM Corporation - initial API and implementation
- *     Simon Scholz <simon.scholz@vogella.com> - Bug 436344
  *******************************************************************************/
-package org.eclipse.e4.ui.bindings.tests;
+package org.eclipse.jface.dialogs;
 
-import org.junit.platform.suite.api.SelectClasses;
-import org.junit.platform.suite.api.Suite;
-
-@Suite
-@SelectClasses({
-	BindingLookupTest.class,
-	KeyDispatcherTest.class,
-	BindingTableTests.class,
-	BindingCreateTest.class,
-	KeyAssistDialogTest.class })
-public class BindingTestSuite {
+/**
+ * A listener which is notified when the scope for the search page is changed.
+ *
+ * @see IScopeChangeProvider
+ * @see ScopeChangedEvent
+ *
+ * @since 3.38
+ */
+public interface IScopeChangedListener {
+	/**
+	 * Notifies that the selected scope has changed.
+	 *
+	 * @param event event object describing the change
+	 */
+	void scopeChanged(ScopeChangedEvent event);
 }

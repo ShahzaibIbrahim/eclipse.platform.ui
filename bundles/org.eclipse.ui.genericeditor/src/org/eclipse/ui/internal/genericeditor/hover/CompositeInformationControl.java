@@ -141,8 +141,7 @@ public class CompositeInformationControl extends AbstractInformationControl impl
 			LinkedHashMap<ITextHover, IInformationControlCreator> presenterCreators = new LinkedHashMap<>();
 			boolean allNull = true;
 			for (Entry<ITextHover, AbstractInformationControl> hover : this.controls.entrySet()) {
-				IInformationControlCreator creator = hover.getValue()
-							.getInformationPresenterControlCreator();
+				IInformationControlCreator creator = hover.getValue().getInformationPresenterControlCreator();
 				if (creator == null) {
 					creator = this.creators.get(hover.getKey());
 				} else {
@@ -174,9 +173,14 @@ public class CompositeInformationControl extends AbstractInformationControl impl
 
 	private Point computeCompositeSize(Function<AbstractInformationControl, Point> computeSize,
 			Supplier<Point> getDefault) {
-		return controls.values().stream().map(computeSize)
-				.reduce((size1, size2) -> new Point(size1.x + size2.x, size1.y + size2.y + layout.verticalSpacing))
-				.orElseGet(getDefault);
+		return controls.values().stream().map(computeSize).reduce(
+				(size1, size2) -> new Point(Math.max(size1.x, size2.x), size1.y + size2.y + layout.verticalSpacing))
+				.map(size -> {
+					var shellSize = getShell().computeSize(SWT.DEFAULT, SWT.DEFAULT, true);
+					int width = Math.max(size.x, shellSize.x);
+					int height = Math.max(size.y, shellSize.y);
+					return new Point(width, height);
+				}).orElseGet(getDefault);
 	}
 
 }

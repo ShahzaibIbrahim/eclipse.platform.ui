@@ -15,11 +15,11 @@
  *******************************************************************************/
 package org.eclipse.e4.ui.bindings.tests;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,8 +41,8 @@ import org.eclipse.e4.ui.model.application.MApplication;
 import org.eclipse.jface.bindings.Binding;
 import org.eclipse.jface.bindings.keys.KeyBinding;
 import org.eclipse.jface.bindings.keys.KeySequence;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("restriction")
 public class BindingTableTests {
@@ -82,7 +82,7 @@ public class BindingTableTests {
 			"M1+X", ID_WINDOW, PASTE_ID, "M1+V", ID_WINDOW, REFRESH_ID, "F5",
 			ID_DIALOG_AND_WINDOW, EXIT_ID, "CTRL+Q", ID_DIALOG_AND_WINDOW,
 			ABOUT_ID, "CTRL+5 A", ID_DIALOG_AND_WINDOW, TAG_ID, "ALT+/",
-			ID_TEXT, RENAME_ID, "F2", ID_WINDOW, SHOW_TOOLTIP_ID, "F2",
+			ID_TEXT, RENAME_ID, "F2", ID_WINDOW, RENAME_ID, "M2+M3+R", ID_TEXT, SHOW_TOOLTIP_ID, "F2",
 			ID_TEXT, CORR_INDENT_ID, "CTRL+I", ID_JAVA, INDENT_LINE_ID,
 			"CTRL+I", ID_JS, PASTE_ID, "SHIFT+Insert", ID_WINDOW, PASTE_ID,
 			"CTRL+5 V", ID_TEXT, };
@@ -93,7 +93,7 @@ public class BindingTableTests {
 	static IEclipseContext workbenchContext;
 	private MApplication application;
 
-	@Before
+	@BeforeEach
 	public void setUp() throws Exception {
 		IEclipseContext globalContext = TestUtil.getGlobalContext();
 		workbenchContext = globalContext.createChild("workbenchContext");
@@ -318,6 +318,30 @@ public class BindingTableTests {
 	}
 
 	@Test
+	public void testManagerLookupShortcutDeeperContext() throws Exception {
+		BindingTableManager manager = createManager();
+		// Given a BindingTableManager with default active scheme and context manager:
+		manager.setActiveSchemes(new String[] { "org.eclipse.ui.defaultAcceleratorConfiguration" }, contextManager);
+		Binding paste = getTestBinding(RENAME_ID, ID_TEXT);
+		assertNotNull(paste);
+
+		ArrayList<Context> window = new ArrayList<>();
+		Context winContext = contextManager.getContext(ID_WINDOW);
+		Context dawContext = contextManager.getContext(ID_TEXT);
+		window.add(winContext);
+		window.add(dawContext);
+		ContextSet windowSet = manager.createContextSet(window);
+		// When getting the best sequence for the paste command:
+		Binding match = manager.getBestSequenceFor(windowSet, paste.getParameterizedCommand());
+		// Then the paste binding with the ID_TEXT context should be returned, because
+		// it's more specific than the ID_WINDOW context:
+		assertEquals(paste, match);
+
+		// disable context manager in BindingComparator for other tests:
+		manager.setActiveSchemes(null, null);
+	}
+
+	@Test
 	public void testManagerLookupShortcutLongChain() throws Exception {
 		BindingTableManager manager = createManager();
 		Binding paste = getTestBinding(PASTE_ID);
@@ -387,9 +411,19 @@ public class BindingTableTests {
 		return null;
 	}
 
+	private Binding getTestBinding(String commandId, String contextId) {
+		for (Binding binding : loadedBindings) {
+			if (commandId.equals(binding.getParameterizedCommand().getId())
+					&& contextId.equals(binding.getContextId())) {
+				return binding;
+			}
+		}
+		return null;
+	}
+
 	private void assertContextSet(ContextSet set, String[] contextIds) {
 		List<Context> contexts = set.getContexts();
-		assertEquals(contexts.toString(), contextIds.length, contexts.size());
+		assertEquals(contextIds.length, contexts.size(), contexts.toString());
 		for (int i = 0; i < contextIds.length; i++) {
 			assertEquals(contextIds[i], contexts.get(i).getId());
 		}
