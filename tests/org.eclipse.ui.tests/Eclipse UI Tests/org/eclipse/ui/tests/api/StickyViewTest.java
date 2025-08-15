@@ -14,6 +14,9 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.api;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.ui.IEditorPart;
@@ -32,9 +35,11 @@ import org.eclipse.ui.internal.WorkbenchPlugin;
 import org.eclipse.ui.internal.util.PrefUtil;
 import org.eclipse.ui.part.FileEditorInput;
 import org.eclipse.ui.tests.harness.util.FileUtil;
+import org.eclipse.ui.tests.harness.util.PreferenceMementoRule;
 import org.eclipse.ui.tests.harness.util.UITestCase;
 import org.eclipse.ui.views.IStickyViewDescriptor;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -45,6 +50,9 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class StickyViewTest extends UITestCase {
 
+	@Rule
+	public final PreferenceMementoRule preferenceMemento = new PreferenceMementoRule();
+
 	private IWorkbenchWindow window;
 
 	private IWorkbenchPage page;
@@ -54,76 +62,67 @@ public class StickyViewTest extends UITestCase {
 	}
 
 	@Test
-	public void testStackPlacementRight() {
+	public void testStackPlacementRight() throws PartInitException {
 		testStackPlacement("Right");
 	}
 
 	@Test
-	public void testStackPlacementLeft() {
+	public void testStackPlacementLeft() throws PartInitException {
 		testStackPlacement("Left");
 	}
 
 	@Test
-	public void testStackPlacementTop() {
+	public void testStackPlacementTop() throws PartInitException {
 		testStackPlacement("Top");
 	}
 
 	@Test
-	public void testStackPlacementBottom() {
+	public void testStackPlacementBottom() throws PartInitException {
 		testStackPlacement("Bottom");
 	}
 
 	/**
 	 * Tests to ensure that sticky views are opened in the same stack.
+	 *
+	 * @throws PartInitException
 	 */
-	private void testStackPlacement(String location) {
-		try {
-			IViewPart part1 = page
-					.showView("org.eclipse.ui.tests.api.StickyView" + location
-							+ "1");
-			assertNotNull(part1);
-			IViewPart part2 = page
-					.showView("org.eclipse.ui.tests.api.StickyView" + location
-							+ "2");
-			assertNotNull(part2);
-			IViewPart[] stack = page.getViewStack(part1);
+	private void testStackPlacement(String location) throws PartInitException {
+		IViewPart part1 = page.showView("org.eclipse.ui.tests.api.StickyView" + location + "1");
+		assertNotNull(part1);
+		IViewPart part2 = page.showView("org.eclipse.ui.tests.api.StickyView" + location + "2");
+		assertNotNull(part2);
+		IViewPart[] stack = page.getViewStack(part1);
 
-			assertTrue(ViewUtils.findInStack(stack, part1));
-			assertTrue(ViewUtils.findInStack(stack, part2));
-
-		} catch (PartInitException e) {
-			fail(e.getMessage());
-		}
-
+		assertTrue(ViewUtils.findInStack(stack, part1));
+		assertTrue(ViewUtils.findInStack(stack, part2));
 	}
 
 	/**
-	 * Tests to ensure that all views in a stack with a known sticky view are also sticky.
+	 * Tests to ensure that all views in a stack with a known sticky view are also
+	 * sticky.
+	 *
+	 * @throws PartInitException
 	 */
 	@Test
-	public void testStackContents() {
-		try {
-			IViewPart part1 = page
-					.showView("org.eclipse.ui.tests.api.StickyViewRight1");
-			assertNotNull(part1);
+	public void testStackContents() throws PartInitException {
+		IViewPart part1 = page.showView("org.eclipse.ui.tests.api.StickyViewRight1");
+		assertNotNull(part1);
 
-			IViewPart[] stack = page.getViewStack(part1);
+		IViewPart[] stack = page.getViewStack(part1);
 
-			for (IViewPart element : stack) {
-				assertTrue(element.getTitle(), ViewUtils.isSticky(element));
-			}
-		} catch (PartInitException e) {
-			fail(e.getMessage());
+		for (IViewPart element : stack) {
+			assertTrue(element.getTitle(), ViewUtils.isSticky(element));
 		}
 	}
 
 	/**
-	 * Tests whether the moveable flag is being picked up and honoured
-	 * from the XML.
+	 * Tests whether the moveable flag is being picked up and honoured from the XML.
+	 *
+	 * @throws PartInitException
 	 */
 	@Test
 	@Ignore
-	public void XXXtestClosableFlag() {
+	public void XXXtestClosableFlag() throws PartInitException {
 		//explicit closeable = true
 		testCloseable("org.eclipse.ui.tests.api.StickyViewRight1", true);
 		//explicit closeable = false
@@ -134,7 +133,7 @@ public class StickyViewTest extends UITestCase {
 
 	@Test
 	@Ignore
-	public void XXXtestMoveableFlag() {
+	public void XXXtestMoveableFlag() throws PartInitException {
 		//explicit closeable = true
 		testMoveable("org.eclipse.ui.tests.api.StickyViewRight1", true);
 		//explicit closeable = false
@@ -146,89 +145,74 @@ public class StickyViewTest extends UITestCase {
 	/**
 	 * Tests whether a sticky view with the given id is moveable or not.
 	 *
-	 * @param id the id
+	 * @param id          the id
 	 * @param expectation the expected moveable state
+	 * @throws PartInitException
 	 */
-	private void testMoveable(String id, boolean expectation) {
-		try {
-			IViewPart part = page.showView(id);
-			assertNotNull(part);
-			assertTrue(ViewUtils.isSticky(part));
+	private void testMoveable(String id, boolean expectation) throws PartInitException {
+		IViewPart part = page.showView(id);
+		assertNotNull(part);
+		assertTrue(ViewUtils.isSticky(part));
 
-			//tests to ensure that the XML was read correctly
-			IStickyViewDescriptor[] descs = PlatformUI.getWorkbench()
-					.getViewRegistry().getStickyViews();
-			for (IStickyViewDescriptor desc : descs) {
-				if (desc.getId().equals(id)) {
-					assertEquals(expectation, desc.isMoveable());
-				}
+		// tests to ensure that the XML was read correctly
+		IStickyViewDescriptor[] descs = PlatformUI.getWorkbench().getViewRegistry().getStickyViews();
+		for (IStickyViewDescriptor desc : descs) {
+			if (desc.getId().equals(id)) {
+				assertEquals(expectation, desc.isMoveable());
 			}
-
-			// tests to ensure that the property is being honoured by the perspective
-			assertEquals(expectation, ViewUtils.isMoveable(part));
-		} catch (PartInitException e) {
-			fail(e.getMessage());
 		}
+
+		// tests to ensure that the property is being honoured by the perspective
+		assertEquals(expectation, ViewUtils.isMoveable(part));
 	}
 
 	/**
 	 * Tests whether a sticky view with the given id is closeable or not.
 	 *
-	 * @param id the id
+	 * @param id          the id
 	 * @param expectation the expected closeable state
+	 * @throws PartInitException
 	 */
-	private void testCloseable(String id, boolean expectation) {
-		try {
-			IViewPart part = page.showView(id);
-			assertNotNull(part);
-			assertTrue(ViewUtils.isSticky(part));
+	private void testCloseable(String id, boolean expectation) throws PartInitException {
+		IViewPart part = page.showView(id);
+		assertNotNull(part);
+		assertTrue(ViewUtils.isSticky(part));
 
-			//tests to ensure that the XML was read correctly
-			IStickyViewDescriptor[] descs = PlatformUI.getWorkbench()
-					.getViewRegistry().getStickyViews();
-			for (IStickyViewDescriptor desc : descs) {
-				if (desc.getId().equals(id)) {
-					assertEquals(expectation, desc.isCloseable());
-				}
+		// tests to ensure that the XML was read correctly
+		IStickyViewDescriptor[] descs = PlatformUI.getWorkbench().getViewRegistry().getStickyViews();
+		for (IStickyViewDescriptor desc : descs) {
+			if (desc.getId().equals(id)) {
+				assertEquals(expectation, desc.isCloseable());
 			}
-
-			// tests to ensure that the property is being honoured by the perspective
-			assertEquals(expectation, ViewUtils.isCloseable(part));
-		} catch (PartInitException e) {
-			fail(e.getMessage());
 		}
+
+		// tests to ensure that the property is being honoured by the perspective
+		assertEquals(expectation, ViewUtils.isCloseable(part));
 	}
 
 	/**
 	 * Sticky views should remain after perspective reset.
+	 *
+	 * @throws PartInitException
 	 */
 	@Test
-	public void testPerspectiveReset() {
-		try {
-			page.showView("org.eclipse.ui.tests.api.StickyViewRight1");
-			page.resetPerspective();
-			assertNotNull(page
-					.findView("org.eclipse.ui.tests.api.StickyViewRight1"));
-		} catch (PartInitException e) {
-			fail(e.getMessage());
-		}
+	public void testPerspectiveReset() throws PartInitException {
+		page.showView("org.eclipse.ui.tests.api.StickyViewRight1");
+		page.resetPerspective();
+		assertNotNull(page.findView("org.eclipse.ui.tests.api.StickyViewRight1"));
 	}
 
 	/**
 	 * Tests that a sticky view is opened in successive perspectives.
+	 *
+	 * @throws PartInitException
 	 */
 	@Test
-	public void testPerspectiveOpen() {
-		try {
-			page.showView("org.eclipse.ui.tests.api.StickyViewRight1");
-			page.setPerspective(WorkbenchPlugin.getDefault()
-					.getPerspectiveRegistry().findPerspectiveWithId(
-							"org.eclipse.ui.tests.api.SessionPerspective"));
-			assertNotNull(page
-					.findView("org.eclipse.ui.tests.api.StickyViewRight1"));
-		} catch (PartInitException e) {
-			fail(e.getMessage());
-		}
+	public void testPerspectiveOpen() throws PartInitException {
+		page.showView("org.eclipse.ui.tests.api.StickyViewRight1");
+		page.setPerspective(WorkbenchPlugin.getDefault().getPerspectiveRegistry()
+				.findPerspectiveWithId("org.eclipse.ui.tests.api.SessionPerspective"));
+		assertNotNull(page.findView("org.eclipse.ui.tests.api.StickyViewRight1"));
 	}
 
 	/**
@@ -298,7 +282,8 @@ public class StickyViewTest extends UITestCase {
 	public void XXXtestPerspectiveViewToolBarVisible() throws Throwable {
 		// These tests are hard-wired to the pre-3.3 zoom behaviour
 		// Run them anyway to ensure that we preserve the 3.0 mechanism
-		setPreference(PrefUtil.getAPIPreferenceStore(), IWorkbenchPreferenceConstants.ENABLE_NEW_MIN_MAX, false);
+		preferenceMemento.setPreference(PrefUtil.getAPIPreferenceStore(),
+				IWorkbenchPreferenceConstants.ENABLE_NEW_MIN_MAX, false);
 
 		IPerspectiveDescriptor perspective = WorkbenchPlugin.getDefault()
 				.getPerspectiveRegistry().findPerspectiveWithId(
@@ -325,12 +310,10 @@ public class StickyViewTest extends UITestCase {
 
 
 //			assertTrue(facade.isViewPaneVisible(viewRef));
-			// FIXME: No implementation
-			fail("facade.isViewPaneVisible() had no implementation");
+			// FIXME: No implementation for facade.isViewPaneVisible()
 
 //			assertTrue(facade.isViewToolbarVisible(viewRef));
-			// FIXME: No implementation
-			fail("facade.isViewToolbarVisible() had no implementation");
+			// FIXME: No implementation for facade.isViewToolbarVisible()
 
 
 			// open the editor and zoom it.
@@ -341,24 +324,20 @@ public class StickyViewTest extends UITestCase {
 			IWorkbenchPartReference ref = page.getReference(editor);
 			page.toggleZoom(ref);
 //			assertFalse(facade.isViewPaneVisible(viewRef));
-			// FIXME: No implementation
-			fail("facade.isViewPaneVisible() had no implementation");
+			// FIXME: No implementation for facade.isViewPaneVisible()
 
 //			assertFalse(facade.isViewToolbarVisible(viewRef));
-			// FIXME: No implementation
-			fail("facade.isViewToolbarVisible() had no implementation");
+			// FIXME: No implementation facade.isViewToolbarVisible()
 
 
 			// switch to another perspective, and then switch back.
 			page.setPerspective(secondPerspective);
 
 //			assertFalse(facade.isViewPaneVisible(viewRef));
-			// FIXME: No implementation
-			fail("facade.isViewPaneVisible() had no implementation");
+			// FIXME: No implementation facade.isViewPaneVisible()
 
 //			assertFalse(facade.isViewToolbarVisible(viewRef));
-			// FIXME: No implementation
-			fail("facade.isViewToolbarVisible() had no implementation");
+			// FIXME: No implementation facade.isViewToolbarVisible()
 
 
 			page.setPerspective(perspective);
@@ -366,12 +345,10 @@ public class StickyViewTest extends UITestCase {
 
 			// both the view and the toolbar must be not visible
 //			assertFalse(facade.isViewPaneVisible(viewRef));
-			// FIXME: No implementation
-			fail("facade.isViewPaneVisible() had no implementation");
+			// FIXME: No implementation facade.isViewPaneVisible()
 
 //			assertFalse(facade.isViewToolbarVisible(viewRef));
-			// FIXME: No implementation
-			fail("facade.isViewToolbarVisible() had no implementation");
+			// FIXME: No implementation facade.isViewToolbarVisible()
 
 		} finally {
 			if (editor != null) {

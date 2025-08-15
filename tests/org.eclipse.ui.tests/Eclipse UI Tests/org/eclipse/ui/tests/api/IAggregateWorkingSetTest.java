@@ -13,6 +13,8 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.api;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.waitForJobs;
 import static org.junit.Assert.assertArrayEquals;
 
 import java.lang.reflect.Field;
@@ -27,8 +29,10 @@ import org.eclipse.core.runtime.IAdaptable;
 import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.ui.IAggregateWorkingSet;
 import org.eclipse.ui.IMemento;
+import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkingSet;
 import org.eclipse.ui.IWorkingSetManager;
+import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.XMLMemento;
 import org.eclipse.ui.internal.AbstractWorkingSet;
 import org.eclipse.ui.internal.AbstractWorkingSetManager;
@@ -47,6 +51,7 @@ public class IAggregateWorkingSetTest extends UITestCase {
 	static final String AGGREGATE_WORKING_SET_NAME_ = "testaggregatews";
 	static final String WSET_PAGE_ID="org.eclipse.ui.resourceWorkingSetPage";
 	IWorkspace fWorkspace;
+	IWorkbench fWorkbench;
 
 	IWorkingSet[] components;
 	List<IWorkingSet> backup;
@@ -59,11 +64,11 @@ public class IAggregateWorkingSetTest extends UITestCase {
 	@Override
 	protected void doSetUp() throws Exception {
 		super.doSetUp();
-		IWorkingSetManager workingSetManager = fWorkbench
-		.getWorkingSetManager();
+		IWorkingSetManager workingSetManager = PlatformUI.getWorkbench().getWorkingSetManager();
 		backup = Arrays.asList(workingSetManager.getAllWorkingSets());
 
 		fWorkspace = ResourcesPlugin.getWorkspace();
+		fWorkbench = PlatformUI.getWorkbench();
 		components = new IWorkingSet[4];
 		for (int i = 0; i < 4; i++) {
 			components[i] = workingSetManager.createWorkingSet(WORKING_SET_NAME
@@ -89,6 +94,7 @@ public class IAggregateWorkingSetTest extends UITestCase {
 				workingSetManager.removeWorkingSet(wset);
 			}
 		}
+		fWorkbench = null;
 		super.doTearDown();
 	}
 
@@ -173,9 +179,6 @@ public class IAggregateWorkingSetTest extends UITestCase {
 			aggregateReloaded = (IAggregateWorkingSet) manager.createWorkingSet(memento);
 			manager.addWorkingSet(aggregateReloaded);
 			aggregateReloaded.getComponents();
-		} catch (StackOverflowError e) {
-			e.printStackTrace();
-			fail("Stack overflow for self-referenced aggregate working set", e);
 		} finally {
 			if (aggregateReloaded != null) {
 				manager.removeWorkingSet(aggregateReloaded);
@@ -230,9 +233,6 @@ public class IAggregateWorkingSetTest extends UITestCase {
 			for (IWorkingSet aggregate2 : aggregates) {
 				assertFalse("testCycle".equals(aggregate2.getName()));
 			}
-		} catch (StackOverflowError e) {
-			e.printStackTrace();
-			fail("Stack overflow for self-referenced aggregate working set", e);
 		} finally {
 			if (aggregateReloaded != null) {
 				manager.removeWorkingSet(aggregateReloaded);
@@ -307,23 +307,8 @@ public class IAggregateWorkingSetTest extends UITestCase {
 			assertNotNull("Unable to save/restore correctly", restoredC);
 			assertNotNull("Unable to save/restore correctly", restoredB);
 
-			IWorkingSet[] componenents1 = wSetB.getComponents();
-			IWorkingSet[] componenents2 = restoredB.getComponents();
-
-			if (componenents1.length != componenents2.length) {
-				assertArrayEquals(nameB + " has lost data in the process of save/restore: " + restoredB,
-						wSetB.getComponents(), restoredB.getComponents());
-			} else {
-				for (int i = 0; i < componenents1.length; i++) {
-					if (!componenents1[i].equals(componenents2[i])) {
-						assertEquals(nameB + " has lost data in the process of save/restore: " + restoredB,
-								componenents1[i].toString(), componenents2[i].toString());
-						fail("equals() and toString() do not match for: " + componenents1[i] + " and "
-								+ componenents2[i]);
-					}
-				}
-			}
-
+			assertArrayEquals(nameB + " has lost data in the process of save/restore: " + restoredB,
+					wSetB.getComponents(), restoredB.getComponents());
 		} finally {
 			// restore
 			IWorkingSet set = manager.getWorkingSet(nameA);
@@ -400,7 +385,13 @@ public class IAggregateWorkingSetTest extends UITestCase {
 				if (!(ws instanceof AggregateWorkingSet aws)) {
 					return;
 				}
-				IMemento m = readField(AbstractWorkingSet.class, "workingSetMemento", IMemento.class, aws);
+				IMemento m;
+				try {
+					m = readField(AbstractWorkingSet.class, "workingSetMemento", IMemento.class, aws);
+				} catch (Exception e) {
+					error.set(e.getMessage());
+					return;
+				}
 				IWorkingSet[] sets = aws.getComponents();
 				if (m != null) {
 					IMemento[] msets = m.getChildren(IWorkbenchConstants.TAG_WORKING_SET);
@@ -457,7 +448,7 @@ public class IAggregateWorkingSetTest extends UITestCase {
 		}
 	}
 
-	private IMemento saveAndRemoveWorkingSets(IWorkingSet... sets) {
+	private IMemento saveAndRemoveWorkingSets(IWorkingSet... sets) throws Exception {
 		IMemento managerMemento = XMLMemento
 				.createWriteRoot(IWorkbenchConstants.TAG_WORKING_SET_MANAGER);
 		IWorkingSetManager manager = fWorkbench.getWorkingSetManager();
@@ -482,7 +473,7 @@ public class IAggregateWorkingSetTest extends UITestCase {
 		return managerMemento;
 	}
 
-	private void restoreWorkingSetManager(IMemento managerMemento) {
+	private void restoreWorkingSetManager(IMemento managerMemento) throws Exception {
 		IWorkingSetManager manager = fWorkbench.getWorkingSetManager();
 
 		invokeMethod(AbstractWorkingSetManager.class, "restoreWorkingSetState",
@@ -494,25 +485,16 @@ public class IAggregateWorkingSetTest extends UITestCase {
 	}
 
 	private Object invokeMethod(Class<?> clazz, String methodName, Object instance, Object[] args,
-			Class<?>[] argsClasses) {
-		try {
-			Method method = clazz.getDeclaredMethod(methodName, argsClasses);
-			method.setAccessible(true);
-			return method.invoke(instance, args);
-		} catch (Exception e) {
-			fail("Failure in invoking " + clazz.getName() + methodName, e);
-		}
-		return null;
+			Class<?>[] argsClasses) throws Exception {
+		Method method = clazz.getDeclaredMethod(methodName, argsClasses);
+		method.setAccessible(true);
+		return method.invoke(instance, args);
 	}
 
-	private <T> T readField(Class<?> clazz, String filedName, Class<T> type, Object instance) {
-		try {
-			Field field = clazz.getDeclaredField(filedName);
-			field.setAccessible(true);
-			return type.cast(field.get(instance));
-		} catch (Exception e) {
-			fail("Failure in reading " + clazz.getName() + filedName, e);
-		}
-		return null;
+	private <T> T readField(Class<?> clazz, String filedName, Class<T> type, Object instance)
+			throws Exception {
+		Field field = clazz.getDeclaredField(filedName);
+		field.setAccessible(true);
+		return type.cast(field.get(instance));
 	}
 }

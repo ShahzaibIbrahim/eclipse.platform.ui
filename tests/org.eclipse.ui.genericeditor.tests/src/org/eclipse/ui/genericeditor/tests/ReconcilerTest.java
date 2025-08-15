@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2017 Red Hat Inc. and others.
+ * Copyright (c) 2017, 2025 Red Hat Inc. and others.
  *
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
@@ -13,9 +13,11 @@
  *******************************************************************************/
 package org.eclipse.ui.genericeditor.tests;
 
+import static org.eclipse.ui.tests.harness.util.DisplayHelper.runEventLoop;
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayInputStream;
 
-import org.junit.Assert;
 import org.junit.Test;
 
 import org.eclipse.core.runtime.NullProgressMonitor;
@@ -26,7 +28,6 @@ import org.eclipse.core.resources.ResourcesPlugin;
 
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.IDocument;
-import org.eclipse.jface.text.tests.util.DisplayHelper;
 
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.genericeditor.tests.contributions.EnabledPropertyTester;
@@ -34,7 +35,7 @@ import org.eclipse.ui.genericeditor.tests.contributions.ReconcilerStrategyFirst;
 import org.eclipse.ui.genericeditor.tests.contributions.ReconcilerStrategySecond;
 import org.eclipse.ui.internal.genericeditor.ExtensionBasedTextEditor;
 import org.eclipse.ui.part.FileEditorInput;
-import org.eclipse.ui.tests.harness.util.UITestCase;
+import org.eclipse.ui.tests.harness.util.DisplayHelper;
 
 import org.eclipse.ui.texteditor.IDocumentProvider;
 
@@ -88,17 +89,14 @@ public class ReconcilerTest extends AbstratGenericEditorTest {
 
 		doc.set(startingText);
 
-		new DisplayHelper() {
-			@Override
-			protected boolean condition() {
-					try {
-						return doc.get(0, doc.getLineLength(0)).contains(expectedText);
-					} catch (BadLocationException e) {
-						return false;
-					}
+		DisplayHelper.waitForCondition(window.getShell().getDisplay(), 2000, () -> {
+			try {
+				return doc.get(0, doc.getLineLength(0)).contains(expectedText);
+			} catch (BadLocationException e) {
+				return false;
 			}
-		}.waitForCondition(window.getShell().getDisplay(), 2000);
-		Assert.assertTrue("file was not affected by reconciler", doc.get().contains(expectedText));
+		});
+		assertTrue("file was not affected by reconciler", doc.get().contains(expectedText));
 	}
 
 	@Override
@@ -106,7 +104,7 @@ public class ReconcilerTest extends AbstratGenericEditorTest {
 		if (secondEditor != null) {
 			secondEditor.close(false);
 			secondEditor = null;
-			UITestCase.processEvents();
+			runEventLoop(PlatformUI.getWorkbench().getDisplay(),0);
 		}
 		if (secondFile != null) {
 			secondFile.delete(true, new NullProgressMonitor());

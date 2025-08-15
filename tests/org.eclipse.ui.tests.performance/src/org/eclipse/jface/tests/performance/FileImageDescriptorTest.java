@@ -14,7 +14,8 @@
 
 package org.eclipse.jface.tests.performance;
 
-import java.io.IOException;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -70,12 +71,7 @@ public class FileImageDescriptorTest extends BasicPerformanceTest {
 
 				for (URL file : files) {
 					startMeasuring();
-					try {
-						descriptor = ImageDescriptor.createFromFile(missing, FileLocator.toFileURL(file).getFile());
-					} catch (IOException e) {
-						fail(e.getLocalizedMessage(), e);
-						continue;
-					}
+					descriptor = ImageDescriptor.createFromFile(missing, FileLocator.toFileURL(file).getFile());
 
 					for (int j = 0; j < 10; j++) {
 						Image image = descriptor.createImage();

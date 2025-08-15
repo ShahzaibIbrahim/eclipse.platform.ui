@@ -14,18 +14,25 @@
 
 package org.eclipse.ui.tests.internal;
 
+import static org.eclipse.ui.PlatformUI.getWorkbench;
+
 import org.eclipse.e4.ui.workbench.modeling.EModelService;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.ui.IWorkbenchPreferenceConstants;
 import org.eclipse.ui.internal.WorkbenchWindow;
 import org.eclipse.ui.internal.util.PrefUtil;
+import org.eclipse.ui.tests.harness.util.PreferenceMementoRule;
 import org.eclipse.ui.tests.harness.util.UITestCase;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class PerspectiveSwitcherTest extends UITestCase {
+
+	@Rule
+	public final PreferenceMementoRule preferenceMemento = new PreferenceMementoRule();
 
 	public PerspectiveSwitcherTest() {
 		super(PerspectiveSwitcherTest.class.getSimpleName());
@@ -39,11 +46,12 @@ public class PerspectiveSwitcherTest extends UITestCase {
 	public void testCreatePerspectiveSwithcerInToolbar() {
 		IPreferenceStore apiPreferenceStore = PrefUtil.getAPIPreferenceStore();
 
-		WorkbenchWindow window = (WorkbenchWindow) fWorkbench.getActiveWorkbenchWindow();
+		WorkbenchWindow window = (WorkbenchWindow) getWorkbench().getActiveWorkbenchWindow();
 		assertNotNull("We should have a perspective bar in the beginning", getPerspectiveSwitcher(window)); //$NON-NLS-1$
 
 		// turn off the 'Open Perspective' item
-		setPreference(apiPreferenceStore, IWorkbenchPreferenceConstants.SHOW_OPEN_ON_PERSPECTIVE_BAR, false);
+		preferenceMemento.setPreference(apiPreferenceStore, IWorkbenchPreferenceConstants.SHOW_OPEN_ON_PERSPECTIVE_BAR,
+				false);
 
 		// check that we still have a perspective bar
 		assertNotNull("The perspective bar should have been created successfully", getPerspectiveSwitcher(window)); //$NON-NLS-1$

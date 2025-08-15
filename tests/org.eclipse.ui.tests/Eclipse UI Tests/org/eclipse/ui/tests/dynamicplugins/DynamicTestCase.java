@@ -13,6 +13,8 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.dynamicplugins;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 
@@ -20,6 +22,8 @@ import org.eclipse.core.runtime.IExtensionDelta;
 import org.eclipse.core.runtime.IRegistryChangeEvent;
 import org.eclipse.core.runtime.IRegistryChangeListener;
 import org.eclipse.core.runtime.Platform;
+import org.eclipse.ui.IWorkbench;
+import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.internal.WorkbenchPlugin;
 import org.eclipse.ui.tests.harness.util.UITestCase;
 import org.eclipse.ui.tests.leaks.LeakTests;
@@ -61,6 +65,10 @@ public abstract class DynamicTestCase extends UITestCase implements
 			Platform.getExtensionRegistry().removeRegistryChangeListener(this);
 			queue = null;
 		}
+	}
+
+	protected static final IWorkbench getWorkbench() {
+		return PlatformUI.getWorkbench();
 	}
 
 	/**

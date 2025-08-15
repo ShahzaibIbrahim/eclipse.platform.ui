@@ -13,6 +13,8 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.datatransfer;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.net.URI;
@@ -72,28 +74,19 @@ public class ExportFileSystemOperationTest extends UITestCase implements
 			new File(FileSystemHelper.getRandomLocation(FileSystemHelper.getTempDir())
 				.toOSString());
 		localDirectory = destination.getAbsolutePath();
-		if (!destination.mkdirs()) {
-			fail("Could not set up destination directory for " + getName());
-		}
+		assertTrue(destination.mkdirs());
 		setUpData();
 	}
 
-	private void setUpData(){
-		try{
-			for (String directoryName : directoryNames) {
-				IFolder folder = project.getFolder(directoryName);
-				folder.create(false, true, new NullProgressMonitor());
-				for (String fileName : fileNames) {
-					IFile file = folder.getFile(fileName);
-					String contents =
-						directoryName + ", " + fileName;
-					file.create(new ByteArrayInputStream(contents.getBytes()),
-						true, new NullProgressMonitor());
-				}
+	private void setUpData() throws CoreException {
+		for (String directoryName : directoryNames) {
+			IFolder folder = project.getFolder(directoryName);
+			folder.create(false, true, new NullProgressMonitor());
+			for (String fileName : fileNames) {
+				IFile file = folder.getFile(fileName);
+				String contents = directoryName + ", " + fileName;
+				file.create(new ByteArrayInputStream(contents.getBytes()), true, new NullProgressMonitor());
 			}
-		}
-		catch(Exception e){
-			fail(e.toString());
 		}
 	}
 
@@ -107,10 +100,7 @@ public class ExportFileSystemOperationTest extends UITestCase implements
 		}
 		try {
 			project.delete(true, true, null);
-		} catch (CoreException e) {
-			fail(e.toString());
-		}
-		finally{
+		} finally {
 			project = null;
 			localDirectory = null;
 		}

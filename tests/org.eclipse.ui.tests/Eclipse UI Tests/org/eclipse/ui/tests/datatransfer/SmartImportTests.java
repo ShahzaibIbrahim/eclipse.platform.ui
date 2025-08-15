@@ -14,8 +14,12 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.datatransfer;
 
+import static org.eclipse.ui.PlatformUI.getWorkbench;
 import static org.eclipse.ui.tests.datatransfer.ImportTestUtils.restoreWorkspaceConfiguration;
 import static org.eclipse.ui.tests.datatransfer.ImportTestUtils.setWorkspaceAutoBuild;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEventsUntil;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.waitForJobs;
 
 import java.io.CharArrayReader;
 import java.io.CharArrayWriter;
@@ -61,7 +65,6 @@ import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
 import org.eclipse.ui.IWorkingSet;
 import org.eclipse.ui.IWorkingSetManager;
-import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.dialogs.FilteredTree;
 import org.eclipse.ui.internal.WorkbenchPlugin;
 import org.eclipse.ui.internal.wizards.datatransfer.SmartImportRootWizardPage;
@@ -387,7 +390,7 @@ public class SmartImportTests extends UITestCase {
 
 	@Test
 	public void testInitialWorkingSets() throws Exception {
-		IWorkingSetManager workingSetManager = PlatformUI.getWorkbench().getWorkingSetManager();
+		IWorkingSetManager workingSetManager = getWorkbench().getWorkingSetManager();
 		IWorkingSet workingSet = workingSetManager.createWorkingSet("testWorkingSet", new IAdaptable[0]);
 		workingSet.setId("org.eclipse.ui.resourceWorkingSetPage");
 		workingSetManager.addWorkingSet(workingSet);
@@ -410,7 +413,7 @@ public class SmartImportTests extends UITestCase {
 
 	@Test
 	public void testChangedWorkingSets() throws Exception {
-		IWorkingSetManager workingSetManager = PlatformUI.getWorkbench().getWorkingSetManager();
+		IWorkingSetManager workingSetManager = getWorkbench().getWorkingSetManager();
 		IWorkingSet workingSet = workingSetManager.createWorkingSet("testWorkingSet", new IAdaptable[0]);
 		workingSet.setId("org.eclipse.ui.resourceWorkingSetPage");
 		workingSetManager.addWorkingSet(workingSet);

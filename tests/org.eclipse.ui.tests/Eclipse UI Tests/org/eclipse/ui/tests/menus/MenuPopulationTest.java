@@ -14,6 +14,9 @@
 
 package org.eclipse.ui.tests.menus;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEventsUntil;
+
 import java.lang.reflect.Field;
 
 import org.eclipse.core.runtime.IStatus;
@@ -284,25 +287,24 @@ public class MenuPopulationTest extends MenuTestCase {
 				+ TEST_CONTRIBUTIONS_CACHE_ID);
 
 		IContributionItem ici = manager.find(ID_DEFAULT);
+		assertTrue(ici instanceof CommandContributionItem || ici instanceof HandledContributionItem);
 		if (ici instanceof CommandContributionItem cmd) {
 			assertIcon(cmd, ICONS_ANYTHING_GIF);
 		} else if (ici instanceof HandledContributionItem) {
 			assertIcon((HandledContributionItem)ici, ICONS_ANYTHING_GIF);
-		} else {
-			fail("Failed to find correct contribution item: " + ID_DEFAULT + ": " + ici);
 		}
 
 		ici = manager.find(ID_ALL);
+		assertTrue(ici instanceof CommandContributionItem || ici instanceof HandledContributionItem);
 		if (ici instanceof CommandContributionItem cci) {
 			assertIcon(cci, ICONS_BINARY_GIF);
 		} else if (ici instanceof HandledContributionItem hci) {
 			assertIcon(hci, ICONS_BINARY_GIF);
-		} else {
-			fail("Failed to find correct contribution item: " + ID_ALL + ": " + ici);
 		}
 
 
 		ici = manager.find(ID_TOOLBAR);
+		assertTrue(ici instanceof CommandContributionItem || ici instanceof HandledContributionItem);
 		if (ici instanceof CommandContributionItem cmd) {
 			ImageDescriptor icon = (ImageDescriptor) iconField.get(cmd);
 			assertNull(icon);
@@ -322,33 +324,27 @@ public class MenuPopulationTest extends MenuTestCase {
 				+ TEST_CONTRIBUTIONS_CACHE_ID);
 
 		IContributionItem ici = manager.find(ID_DEFAULT);
+		assertTrue(ici instanceof CommandContributionItem || ici instanceof HandledContributionItem);
 		if (ici instanceof CommandContributionItem cmd) {
 			assertIcon(cmd, ICONS_ANYTHING_GIF);
 		} else if (ici instanceof HandledContributionItem hci) {
 			assertIcon(hci, ICONS_ANYTHING_GIF);
-		} else {
-			fail("Failed to find correct contribution item: " + ID_DEFAULT + ": " + ici);
 		}
 
-
 		ici = manager.find(ID_ALL);
+		assertTrue(ici instanceof CommandContributionItem || ici instanceof HandledContributionItem);
 		if (ici instanceof CommandContributionItem cci) {
 			assertIcon(cci, ICONS_MOCK_GIF);
 		} else if (ici instanceof HandledContributionItem hci) {
 			assertIcon(hci, ICONS_MOCK_GIF);
-		} else {
-			fail("Failed to find correct contribution item: " + ID_ALL + ": " + ici);
 		}
 
-
-
 		ici = manager.find(ID_TOOLBAR);
+		assertTrue(ici instanceof CommandContributionItem || ici instanceof HandledContributionItem);
 		if (ici instanceof CommandContributionItem cci) {
 			assertIcon(cci, ICONS_VIEW_GIF);
 		} else if (ici instanceof HandledContributionItem hci) {
 			assertIcon(hci, ICONS_VIEW_GIF);
-		} else {
-			fail("Failed to find correct contribution item: " + ID_TOOLBAR + ": " + ici);
 		}
 
 		manager.dispose();

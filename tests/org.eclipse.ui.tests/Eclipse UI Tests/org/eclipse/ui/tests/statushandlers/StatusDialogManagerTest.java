@@ -15,13 +15,14 @@
 
 package org.eclipse.ui.tests.statushandlers;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
@@ -69,7 +70,6 @@ import org.eclipse.ui.statushandlers.StatusManager.INotificationListener;
 import org.eclipse.ui.statushandlers.WorkbenchErrorHandler;
 import org.eclipse.ui.statushandlers.WorkbenchStatusDialogManager;
 import org.eclipse.ui.tests.concurrency.FreezeMonitor;
-import org.eclipse.ui.tests.harness.util.UITestCase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -534,58 +534,49 @@ public class StatusDialogManagerTest {
 
 	@Test
 	public void testNullLabelProvider(){
-		try {
-			wsdm.setStatusListLabelProvider(null);
-			fail();
-		} catch (IllegalArgumentException iae){
-			assertTrue(true);
-		}
+		assertThrows(IllegalArgumentException.class, () -> wsdm.setStatusListLabelProvider(null));
 	}
 
 	//bug 235254
 	@Test
-	public void testNonNullLabelProvider(){
-		try {
-			final boolean [] called = new boolean[]{false};
-			wsdm.setStatusListLabelProvider(new ITableLabelProvider(){
+	public void testNonNullLabelProvider() {
+		final boolean[] called = new boolean[] { false };
+		wsdm.setStatusListLabelProvider(new ITableLabelProvider() {
 
-				@Override
-				public Image getColumnImage(Object element, int columnIndex) {
-					return null;
-				}
+			@Override
+			public Image getColumnImage(Object element, int columnIndex) {
+				return null;
+			}
 
-				@Override
-				public String getColumnText(Object element, int columnIndex) {
-					called[0] = true;
-					return "";
-				}
+			@Override
+			public String getColumnText(Object element, int columnIndex) {
+				called[0] = true;
+				return "";
+			}
 
-				@Override
-				public void addListener(ILabelProviderListener listener) {
+			@Override
+			public void addListener(ILabelProviderListener listener) {
 
-				}
+			}
 
-				@Override
-				public void dispose() {
+			@Override
+			public void dispose() {
 
-				}
+			}
 
-				@Override
-				public boolean isLabelProperty(Object element, String property) {
-					return false;
-				}
+			@Override
+			public boolean isLabelProperty(Object element, String property) {
+				return false;
+			}
 
-				@Override
-				public void removeListener(ILabelProviderListener listener) {
+			@Override
+			public void removeListener(ILabelProviderListener listener) {
 
-				}
+			}
 
-			});
-			wsdm.addStatusAdapter(createStatusAdapter(MESSAGE_1), true);
-			assertTrue(called[0]);
-		} catch (Exception e){
-			fail();
-		}
+		});
+		wsdm.addStatusAdapter(createStatusAdapter(MESSAGE_1), true);
+		assertTrue(called[0]);
 	}
 
 	/**
@@ -617,10 +608,10 @@ public class StatusDialogManagerTest {
 	}
 
 	private void processRemainingUiEvents() {
-		UITestCase.processEvents();
+		processEvents();
 		int count = 0;
 		while (count < 3 && (StatusDialogUtil.getStatusShell() != null)) {
-			UITestCase.processEvents();
+			processEvents();
 			count++;
 		}
 	}
@@ -628,7 +619,7 @@ public class StatusDialogManagerTest {
 	private void assertStatusShellOpen() {
 		int count = 0;
 		while (count < 42 && (StatusDialogUtil.getStatusShell() == null)) {
-			UITestCase.processEvents();
+			processEvents();
 			count++;
 		}
 		assertNotNull("Status shell was not shown!", StatusDialogUtil.getStatusShell());
@@ -697,12 +688,7 @@ public class StatusDialogManagerTest {
 		WorkbenchStatusDialogManager wsdm = new WorkbenchStatusDialogManager(
 				IStatus.CANCEL, null);
 		StatusAdapter sa = createStatusAdapter(MESSAGE_1);
-		try {
-			wsdm.addStatusAdapter(sa, false);
-			assertTrue(true);
-		} catch (NullPointerException npe){
-			fail();
-		}
+		wsdm.addStatusAdapter(sa, false);
 	}
 
 	@Test
@@ -721,11 +707,7 @@ public class StatusDialogManagerTest {
 
 			}
 		});
-		try{
-			wsdm.addStatusAdapter(bomb, false);
-		} catch (Throwable t) {
-			fail("no exception should be thrown");
-		}
+		wsdm.addStatusAdapter(bomb, false);
 		assertTrue("Dialog should not display on failure",
 				StatusDialogUtil.getStatusShell() == null);
 		wsdm.addStatusAdapter(createStatusAdapter("normal one"), false);
@@ -736,12 +718,7 @@ public class StatusDialogManagerTest {
 	// checking if the statuses are correctly ignored.
 	@Test
 	public void testOKStatus1() {
-		try {
-			wsdm.addStatusAdapter(new StatusAdapter(Status.OK_STATUS), false);
-			assertTrue(true);
-		} catch (NullPointerException npe) {
-			fail();
-		}
+		wsdm.addStatusAdapter(new StatusAdapter(Status.OK_STATUS), false);
 		assertNull("Shell should not be created.", StatusDialogUtil
 				.getStatusShell());
 		wsdm.addStatusAdapter(createStatusAdapter(MESSAGE_1), false);
@@ -1194,7 +1171,7 @@ public class StatusDialogManagerTest {
 			postUnblockingTask();
 
 			// Allow the blocking dialog to be shown
-			UITestCase.processEvents();
+			processEvents();
 			StatusManager.getManager().removeListener(listener);
 		}
 		assertFalse("Job should successfully finish", semaphore.hasQueuedThreads());

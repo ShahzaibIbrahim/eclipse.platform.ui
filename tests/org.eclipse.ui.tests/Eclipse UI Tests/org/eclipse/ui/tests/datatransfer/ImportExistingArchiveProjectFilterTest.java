@@ -14,6 +14,9 @@
 
 package org.eclipse.ui.tests.datatransfer;
 
+import static org.eclipse.ui.PlatformUI.getWorkbench;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -41,7 +44,6 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.IPageLayout;
 import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IWorkbenchPage;
-import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.internal.WorkbenchPlugin;
 import org.eclipse.ui.internal.dialogs.ImportExportWizard;
 import org.eclipse.ui.internal.wizards.datatransfer.WizardProjectsImportPage;
@@ -114,9 +116,7 @@ public class ImportExistingArchiveProjectFilterTest extends UITestCase {
 		wpip.createProjects();
 
 		workspaceProjects = root.getProjects();
-		if (workspaceProjects.length != 1) {
-			fail("Incorrect Number of projects imported");
-		}
+		assertEquals("Incorrect Number of projects imported", 1, workspaceProjects.length);
 
 		IWorkbenchPage page = getWorkbench().showPerspective(EmptyPerspective.PERSP_ID,
 				getWorkbench().getActiveWorkbenchWindow());
@@ -124,12 +124,7 @@ public class ImportExistingArchiveProjectFilterTest extends UITestCase {
 		IViewPart navigator = page.showView(IPageLayout.ID_PROJECT_EXPLORER);
 		assertNotNull("failed to open project explorer", navigator);
 
-		ProjectExplorer projectExplorer = null;
-		try {
-			projectExplorer = (ProjectExplorer) navigator;
-		} catch (ClassCastException e) {
-			fail(e.getMessage());
-		}
+		ProjectExplorer projectExplorer = (ProjectExplorer) navigator;
 		// Check project explorer for visibility of res folder for which resource filter
 		// is applied to hide on import
 		TreeViewer treeViewer = projectExplorer.getCommonViewer();
@@ -194,6 +189,6 @@ public class ImportExistingArchiveProjectFilterTest extends UITestCase {
 	}
 
 	private Shell getShell() {
-		return PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
+		return getWorkbench().getActiveWorkbenchWindow().getShell();
 	}
 }

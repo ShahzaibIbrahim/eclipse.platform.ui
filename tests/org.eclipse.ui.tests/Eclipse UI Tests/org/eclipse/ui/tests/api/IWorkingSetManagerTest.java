@@ -14,7 +14,10 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.api;
 
+import static org.eclipse.ui.PlatformUI.getWorkbench;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertThrows;
 
 import java.util.Arrays;
 
@@ -73,7 +76,7 @@ public class IWorkingSetManagerTest extends UITestCase {
 	@Override
 	protected void doSetUp() throws Exception {
 		super.doSetUp();
-		fWorkingSetManager = fWorkbench.getWorkingSetManager();
+		fWorkingSetManager = getWorkbench().getWorkingSetManager();
 		fWorkspace = ResourcesPlugin.getWorkspace();
 		fWorkingSet = fWorkingSetManager.createWorkingSet(WORKING_SET_NAME_1,
 				new IAdaptable[] { fWorkspace.getRoot() });
@@ -301,11 +304,8 @@ public class IWorkingSetManagerTest extends UITestCase {
 		fWorkingSetManager.addWorkingSet(fWorkingSet);
 		assertArrayEquals(new IWorkingSet[] { fWorkingSet }, fWorkingSetManager.getWorkingSets());
 
-		try {
-			fWorkingSetManager.addWorkingSet(fWorkingSet);
-			fail("Added the same set twice");
-		} catch (RuntimeException exception) {
-		}
+		assertThrows("added same set twice", RuntimeException.class,
+				() -> fWorkingSetManager.addWorkingSet(fWorkingSet));
 		assertArrayEquals(new IWorkingSet[] { fWorkingSet }, fWorkingSetManager.getWorkingSets());
 
 		IWorkingSet workingSet2 = fWorkingSetManager.createWorkingSet(
@@ -373,8 +373,7 @@ public class IWorkingSetManagerTest extends UITestCase {
 	@Test
 	public void testRemoveWorkingSetAfterRename() throws Throwable {
 		/* get workingSetManager */
-		IWorkingSetManager workingSetManager =
-			fWorkbench.getWorkingSetManager();
+		IWorkingSetManager workingSetManager = getWorkbench().getWorkingSetManager();
 
 		workingSetManager.addWorkingSet(fWorkingSet);
 		String origName=fWorkingSet.getName();

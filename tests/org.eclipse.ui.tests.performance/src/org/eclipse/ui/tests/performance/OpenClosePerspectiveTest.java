@@ -15,6 +15,10 @@
 
 package org.eclipse.ui.tests.performance;
 
+import static org.eclipse.ui.PlatformUI.getWorkbench;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -116,8 +120,7 @@ public class OpenClosePerspectiveTest extends BasicPerformanceTest {
 	private void closePerspective(IWorkbenchPage activePage) {
 		IPerspectiveDescriptor persp = activePage.getPerspective();
 
-		ICommandService commandService = fWorkbench
-				.getService(ICommandService.class);
+		ICommandService commandService = getWorkbench().getService(ICommandService.class);
 		Command command = commandService
 				.getCommand("org.eclipse.ui.window.closePerspective");
 
@@ -128,8 +131,7 @@ public class OpenClosePerspectiveTest extends BasicPerformanceTest {
 		ParameterizedCommand pCommand = ParameterizedCommand.generateCommand(
 				command, parameters);
 
-		IHandlerService handlerService = fWorkbench
-				.getService(IHandlerService.class);
+		IHandlerService handlerService = getWorkbench().getService(IHandlerService.class);
 		try {
 			handlerService.executeCommand(pCommand, null);
 		} catch (ExecutionException | NotDefinedException | NotEnabledException | NotHandledException e1) {

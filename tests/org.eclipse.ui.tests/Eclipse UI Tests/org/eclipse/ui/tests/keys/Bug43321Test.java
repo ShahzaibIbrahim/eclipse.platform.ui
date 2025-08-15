@@ -14,8 +14,8 @@
 
 package org.eclipse.ui.tests.keys;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
@@ -37,7 +37,6 @@ import org.eclipse.ui.internal.keys.BindingService;
 import org.eclipse.ui.keys.IBindingService;
 import org.eclipse.ui.tests.harness.util.CloseTestWindowsRule;
 import org.eclipse.ui.tests.harness.util.FileUtil;
-import org.eclipse.ui.tests.harness.util.UITestCase;
 import org.eclipse.ui.texteditor.AbstractTextEditor;
 import org.junit.Rule;
 import org.junit.Test;
@@ -66,7 +65,7 @@ public class Bug43321Test {
 	@Test
 	public void testNoCheckOnNonCheckbox() throws CommandException,
 			CoreException, ParseException {
-		IWorkbenchWindow window = UITestCase.openTestWindow();
+		IWorkbenchWindow window = openTestWindow();
 		IProject testProject = FileUtil.createProject("TestProject"); //$NON-NLS-1$
 		IFile textFile = testProject.getFile("A.txt"); //$NON-NLS-1$
 		String contents = "A blurb"; //$NON-NLS-1$
@@ -91,10 +90,6 @@ public class Bug43321Test {
 				.getGlobalActionHandler(ActionFactory.COPY.getId());
 		assertTrue("Non-checkbox menu item is checked.", !action.isChecked()); //$NON-NLS-1$
 
-		try {
-			FileUtil.deleteProject(testProject);
-		} catch (CoreException e) {
-			fail(e.toString());
-		}
+		FileUtil.deleteProject(testProject);
 	}
 }

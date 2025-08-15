@@ -13,6 +13,8 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.navigator;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+
 import java.io.ByteArrayInputStream;
 
 import org.eclipse.core.resources.IFile;
@@ -81,11 +83,7 @@ public abstract class AbstractNavigatorTest extends UITestCase {
 	@Override
 	protected void doTearDown() throws Exception {
 		if (testProject != null) {
-			try {
-				testProject.delete(true, null);
-			} catch (CoreException e) {
-				fail(e.toString());
-			}
+			testProject.delete(true, null);
 			testProject = null;
 			testFolder = null;
 			testFile = null;

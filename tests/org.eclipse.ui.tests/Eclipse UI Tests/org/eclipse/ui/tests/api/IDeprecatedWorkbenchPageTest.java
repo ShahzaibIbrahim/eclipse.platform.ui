@@ -13,6 +13,10 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.api;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.getPageInput;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestPage;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IProject;
@@ -22,6 +26,7 @@ import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IPageLayout;
 import org.eclipse.ui.IPerspectiveDescriptor;
 import org.eclipse.ui.IViewPart;
+import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
@@ -40,6 +45,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class IDeprecatedWorkbenchPageTest extends UITestCase {
 
+	private IWorkbench fWorkbench;
+
 	private IWorkbenchPage fActivePage;
 
 	private IWorkbenchWindow fWin;
@@ -53,6 +60,7 @@ public class IDeprecatedWorkbenchPageTest extends UITestCase {
 	@Override
 	protected void doSetUp() throws Exception {
 		super.doSetUp();
+		fWorkbench = PlatformUI.getWorkbench();
 		fWin = openTestWindow();
 		fActivePage = fWin.getActivePage();
 	}
@@ -64,6 +72,7 @@ public class IDeprecatedWorkbenchPageTest extends UITestCase {
 			FileUtil.deleteProject(proj);
 			proj = null;
 		}
+		fWorkbench = null;
 	}
 
 	/**
@@ -842,8 +851,7 @@ public class IDeprecatedWorkbenchPageTest extends UITestCase {
 		String id = MockActionDelegate.ACTION_SET_ID;
 
 //		int totalBefore = facade.getActionSetCount(fActivePage);
-		// FIXME: No implementation
-		fail("facade.getActionSetCount() had no implementation");
+		// FIXME: No implementation for facade.getActionSetCount()
 
 		fActivePage.showActionSet(id);
 
@@ -854,8 +862,7 @@ public class IDeprecatedWorkbenchPageTest extends UITestCase {
 		fActivePage.showActionSet(id);
 
 //		facade.assertActionSetId(fActivePage, id, false);
-		// FIXME: No implementation
-		fail("facade.assertActionSetId() had no implementation");
+		// FIXME: No implementation for facade.assertActionSetId()
 
 //		assertEquals(facade.getActionSetCount(fActivePage), totalBefore + 1);
 	}
@@ -864,9 +871,7 @@ public class IDeprecatedWorkbenchPageTest extends UITestCase {
 	@Ignore
 	public void XXXtestHideActionSet() {
 //		int totalBefore = facade.getActionSetCount(fActivePage);
-		// FIXME: No implementation
-
-		fail("facade.getActionSetCount() had no implementation");
+		// FIXME: No implementation for facade.getActionSetCount()
 
 		String id = MockWorkbenchWindowActionDelegate.SET_ID;
 		fActivePage.showActionSet(id);
@@ -876,7 +881,6 @@ public class IDeprecatedWorkbenchPageTest extends UITestCase {
 //		assertEquals(facade.getActionSetCount(fActivePage), totalBefore);
 
 //		facade.assertActionSetId(fActivePage, id, false);
-
-		fail("facade.assertActionSetId() had no implementation");
+		// FIXME: No implementation for facade.assertActionSetId()
 	}
 }

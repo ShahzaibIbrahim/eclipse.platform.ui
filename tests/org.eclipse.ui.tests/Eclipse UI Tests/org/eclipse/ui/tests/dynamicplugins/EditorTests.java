@@ -13,6 +13,9 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.dynamicplugins;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+import static org.junit.Assert.assertThrows;
+
 import java.io.ByteArrayInputStream;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
@@ -63,7 +66,7 @@ public class EditorTests extends DynamicTestCase {
 	}
 
 	@Test
-	public void testEditorClosure() throws CoreException {
+	public void testEditorClosure() throws CoreException, IllegalArgumentException, InterruptedException {
 		IWorkbenchWindow window = openTestWindow(IDE.RESOURCE_PERSPECTIVE_ID);
 		IFile file = getFile();
 		getBundle();
@@ -75,11 +78,7 @@ public class EditorTests extends DynamicTestCase {
 		part = null; //null the reference
 
 		removeBundle();
-		try {
-			LeakTests.checkRef(queue, ref);
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+		LeakTests.checkRef(queue, ref);
 
 		assertEquals(0, window.getActivePage().getEditors().length);
 	}
@@ -104,12 +103,7 @@ public class EditorTests extends DynamicTestCase {
 
 		removeBundle();
 		assertNull(registry.findEditor(EDITOR_ID));
-		try {
-			testEditorProperties(desc);
-			fail();
-		}
-		catch (RuntimeException e) {
-		}
+		assertThrows(RuntimeException.class, () -> testEditorProperties(desc));
 	}
 
 	private void testEditorProperties(IEditorDescriptor desc) {

@@ -14,7 +14,11 @@
 
 package org.eclipse.ui.tests.concurrency;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEventsUntil;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.waitForJobs;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -34,7 +38,6 @@ import org.eclipse.ui.internal.WorkbenchPlugin;
 import org.eclipse.ui.internal.views.log.AbstractEntry;
 import org.eclipse.ui.internal.views.log.LogEntry;
 import org.eclipse.ui.internal.views.log.LogView;
-import org.eclipse.ui.tests.harness.util.UITestCase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -54,7 +57,7 @@ public class SyncExecWhileUIThreadWaitsForLock {
 
 	@Before
 	public void setUp() throws Exception {
-		UITestCase.processEvents();
+		processEvents();
 		reportedErrors = new ArrayList<>();
 		listener = (status, plugin) -> reportedErrors.add(status);
 		activePage = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
@@ -64,14 +67,14 @@ public class SyncExecWhileUIThreadWaitsForLock {
 			shouldClose = true;
 			logView = (LogView) activePage.showView(viewId);
 		}
-		UITestCase.processEvents();
+		processEvents();
 		WorkbenchPlugin.log("Log for test: init log view");
-		UITestCase.waitForJobs(100, 10000);
+		waitForJobs(100, 10000);
 		WorkbenchPlugin.getDefault().getLog().addLogListener(listener);
 
 		logView.handleClear();
-		UITestCase.waitForJobs(100, 10000);
-		UITestCase.processEventsUntil(() -> logView.getElements().length == 0, 30000);
+		waitForJobs(100, 10000);
+		processEventsUntil(() -> logView.getElements().length == 0, 30000);
 	}
 
 	@After
@@ -86,9 +89,7 @@ public class SyncExecWhileUIThreadWaitsForLock {
 
 	@Test
 	public void testDeadlock() throws Exception {
-		if (Thread.interrupted()) {
-			fail("Thread was interrupted at start of test");
-		}
+		assertFalse(Thread.interrupted());
 		final ILock lock = Job.getJobManager().newLock();
 		final boolean[] blocked = new boolean[] {false};
 		final boolean[] lockAcquired= new boolean[] {false};
@@ -151,8 +152,8 @@ public class SyncExecWhileUIThreadWaitsForLock {
 		assertEquals("Unexpected child status count reported: " + Arrays.toString(status.getChildren()), 2,
 				status.getChildren().length);
 
-		UITestCase.processEvents();
-		UITestCase.processEventsUntil(() -> logView.getElements().length > 0, 30000);
+		processEvents();
+		processEventsUntil(() -> logView.getElements().length > 0, 30000);
 		AbstractEntry[] elements = logView.getElements();
 		List<AbstractEntry> list = Arrays.asList(elements).stream()
 				.filter(x -> ((LogEntry) x).getMessage().startsWith("To avoid deadlock")).toList();
@@ -163,9 +164,6 @@ public class SyncExecWhileUIThreadWaitsForLock {
 		assertTrue("Unexpected: " + label, label.startsWith("UI thread"));
 		label = ((LogEntry) children[1]).getMessage();
 		assertTrue("Unexpected: " + label, label.startsWith("SyncExec"));
-		if (Thread.interrupted()) {
-			// TODO: re-enable this check after bug 505920 is fixed
-			// fail("Thread was interrupted at end of test");
-		}
+		assertFalse(Thread.interrupted());
 	}
 }

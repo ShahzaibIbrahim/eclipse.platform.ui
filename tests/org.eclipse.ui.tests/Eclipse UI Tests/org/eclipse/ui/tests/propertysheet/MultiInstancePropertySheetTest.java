@@ -14,6 +14,8 @@
 
 package org.eclipse.ui.tests.propertysheet;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
+
 import java.lang.reflect.Field;
 
 import org.eclipse.core.resources.IProject;
@@ -159,12 +161,8 @@ public class MultiInstancePropertySheetTest extends AbstractPropertySheetTest {
 	@Test
 	public void testAllowsMultiple() throws PartInitException {
 		activePage.showView(IPageLayout.ID_PROP_SHEET);
-		try {
-			activePage.showView(IPageLayout.ID_PROP_SHEET, "aSecondaryId",
-					IWorkbenchPage.VIEW_ACTIVATE);
-		} catch (PartInitException e) {
-			fail(e.getMessage());
-		}
+		activePage.showView(IPageLayout.ID_PROP_SHEET, "aSecondaryId",
+				IWorkbenchPage.VIEW_ACTIVATE);
 	}
 
 	/**
@@ -434,7 +432,7 @@ public class MultiInstancePropertySheetTest extends AbstractPropertySheetTest {
 			}
 		}
 
-		processUiEvents();
+		processEvents();
 		// TODO this is required here because the default page is never properly
 		// disposed.
 		testPropertySheetPage.dispose();
@@ -521,7 +519,7 @@ public class MultiInstancePropertySheetTest extends AbstractPropertySheetTest {
 			}
 		}
 
-		processUiEvents();
+		processEvents();
 		// TODO this is required here because the default page is never properly
 		// disposed.
 		testPropertySheetPage.dispose();
@@ -563,7 +561,7 @@ public class MultiInstancePropertySheetTest extends AbstractPropertySheetTest {
 			}
 		}
 
-		processUiEvents();
+		processEvents();
 		// TODO this is required here because the default page is never properly
 		// disposed.
 		testPropertySheetPage.dispose();
@@ -579,7 +577,7 @@ public class MultiInstancePropertySheetTest extends AbstractPropertySheetTest {
 		// populate the 'Properties' view
 		contributingView.getSite().getSelectionProvider().setSelection(selection);
 
-		processUiEvents();
+		processEvents();
 
 		// show the 'Properties' view: it should pick up content from the only
 		// one relevant part: view with given id
@@ -609,11 +607,6 @@ public class MultiInstancePropertySheetTest extends AbstractPropertySheetTest {
 					currentPage instanceof PropertySheetPage);
 		}
 
-	}
-
-	private void processUiEvents() {
-		while (fWorkbench.getDisplay().readAndDispatch()) {
-		}
 	}
 
 }

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2017 Stephan Wahlbrink and others.
+ * Copyright (c) 2017, 2025 Stephan Wahlbrink and others.
  *
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
@@ -14,6 +14,7 @@
 package org.eclipse.ui.genericeditor.tests;
 
 import static org.eclipse.ui.genericeditor.tests.contributions.BarContentAssistProcessor.BAR_CONTENT_ASSIST_PROPOSAL;
+import static org.eclipse.ui.tests.harness.util.DisplayHelper.runEventLoop;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -31,10 +32,11 @@ import org.eclipse.swt.widgets.Text;
 
 import org.eclipse.text.tests.Accessor;
 
+import org.eclipse.jface.text.ITextViewer;
 import org.eclipse.jface.text.contentassist.ContentAssistant;
 import org.eclipse.jface.text.source.SourceViewer;
 
-import org.eclipse.ui.tests.harness.util.UITestCase;
+import org.eclipse.ui.PlatformUI;
 
 import org.eclipse.ui.texteditor.ITextEditorActionConstants;
 import org.eclipse.ui.texteditor.TextOperationAction;
@@ -55,7 +57,7 @@ public class ContextInfoTest extends AbstratGenericEditorTest {
 		TextOperationAction action = (TextOperationAction) editor.getAction(ITextEditorActionConstants.CONTENT_ASSIST_CONTEXT_INFORMATION);
 
 		editor.selectAndReveal(4, 0);
-		UITestCase.processEvents();
+		runEventLoop(PlatformUI.getWorkbench().getDisplay(),0);
 
 		action.update();
 		action.run();
@@ -63,7 +65,7 @@ public class ContextInfoTest extends AbstratGenericEditorTest {
 		assertEquals("idx= 0", getInfoText(this.completionShell));
 
 		editor.selectAndReveal(8, 0);
-		UITestCase.processEvents();
+		runEventLoop(PlatformUI.getWorkbench().getDisplay(),0);
 
 		action.update();
 		action.run();
@@ -80,14 +82,14 @@ public class ContextInfoTest extends AbstratGenericEditorTest {
 		TextOperationAction action = (TextOperationAction) editor.getAction(ITextEditorActionConstants.CONTENT_ASSIST_CONTEXT_INFORMATION);
 
 		editor.selectAndReveal(4, 0);
-		UITestCase.processEvents();
+		runEventLoop(PlatformUI.getWorkbench().getDisplay(),0);
 
 		action.update();
 		action.run();
 		this.completionShell= findNewShell(beforeShells);
 
 		editor.selectAndReveal(8, 0);
-		UITestCase.processEvents();
+		runEventLoop(PlatformUI.getWorkbench().getDisplay(),0);
 
 		action.update();
 		action.run();
@@ -95,17 +97,17 @@ public class ContextInfoTest extends AbstratGenericEditorTest {
 
 		editor.getAction(ITextEditorActionConstants.DELETE_LINE).run();
 
-		SourceViewer sourceViewer= getSourceViewer();
+		ITextViewer sourceViewer= editor.getAdapter(ITextViewer.class);
 		ContentAssistant assist= (ContentAssistant) new Accessor(sourceViewer, SourceViewer.class).get("fContentAssistant");
-		new Accessor(assist, ContentAssistant.class).invoke("hide", new Object[0]);
+		new Accessor(assist, ContentAssistant.class).invoke("hide");
 	}
 
 
 	private Shell findNewShell(Set<Shell> beforeShells) {
-		waitAndDispatch(100);
+		runEventLoop(PlatformUI.getWorkbench().getDisplay(), 100);
 		Shell[] afterShells= findNewShells(beforeShells);
 		if(afterShells.length == 0) {
-			waitAndDispatch(1000);
+			runEventLoop(PlatformUI.getWorkbench().getDisplay(),1000);
 		}
 		afterShells= findNewShells(beforeShells);
 		assertEquals("No new shell found", 1, afterShells.length);

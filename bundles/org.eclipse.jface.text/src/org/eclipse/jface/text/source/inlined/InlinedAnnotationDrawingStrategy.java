@@ -414,7 +414,10 @@ class InlinedAnnotationDrawingStrategy implements IDrawingStrategy {
 				isEndOfLine= false;
 			}
 			// When line text has line header annotation, there is a space on the top, adjust the y by using char height
-			y+= bounds.height - textWidget.getLineHeight();
+			int verticalDrawingOffset= bounds.height - textWidget.getLineHeight();
+			if (verticalDrawingOffset > 0) {
+				y+= verticalDrawingOffset;
+			}
 
 			// Draw the line content annotation
 			annotation.setLocation(x, y);
@@ -475,7 +478,11 @@ class InlinedAnnotationDrawingStrategy implements IDrawingStrategy {
 						gc.setForeground(textWidget.getSelectionForeground());
 						gc.setBackground(textWidget.getSelectionBackground());
 					}
-					gc.drawString(hostCharacter, redrawnHostCharX, redrawnHostCharY, true);
+					String characterToBeDrawn= hostCharacter;
+					if ("\n".equals(characterToBeDrawn)) { //$NON-NLS-1$
+						characterToBeDrawn= ""; //$NON-NLS-1$
+					}
+					gc.drawString(characterToBeDrawn, redrawnHostCharX, redrawnHostCharY, true);
 				}
 				// END TO REMOVE
 			} else if (style != null && style.metrics != null && style.metrics.width != 0) {
@@ -519,7 +526,9 @@ class InlinedAnnotationDrawingStrategy implements IDrawingStrategy {
 
 			// When line text has line header annotation, there is a space on the top, adjust the y by using char height
 			int verticalDrawingOffset= charBounds.height - textWidget.getLineHeight();
-			annotationBounds.y += verticalDrawingOffset;
+			if (verticalDrawingOffset > 0) {
+				annotationBounds.y+= verticalDrawingOffset;
+			}
 
 			// Draw the line content annotation
 			annotation.setLocation(annotationBounds.x, annotationBounds.y);
@@ -564,7 +573,11 @@ class InlinedAnnotationDrawingStrategy implements IDrawingStrategy {
 					gc.setForeground(textWidget.getSelectionForeground());
 					gc.setBackground(textWidget.getSelectionBackground());
 				}
-				gc.drawString(Character.toString(hostCharacter), charBounds.x, charBounds.y + verticalDrawingOffset, true);
+				String characterToBeDrawn= Character.toString(hostCharacter);
+				if ("\n".equals(characterToBeDrawn)) { //$NON-NLS-1$
+					characterToBeDrawn= ""; //$NON-NLS-1$
+				}
+				gc.drawString(characterToBeDrawn, charBounds.x, charBounds.y + verticalDrawingOffset, true);
 				// END TO REMOVE
 			} else if (style != null && style.metrics != null && style.metrics.width != 0) {
 				// line content annotation had an , reset it

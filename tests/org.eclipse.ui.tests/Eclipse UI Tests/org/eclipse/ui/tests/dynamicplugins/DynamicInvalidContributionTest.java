@@ -14,6 +14,8 @@
 
 package org.eclipse.ui.tests.dynamicplugins;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.internal.registry.IWorkbenchRegistryConstants;
 import org.junit.Test;
@@ -39,7 +41,7 @@ public class DynamicInvalidContributionTest extends DynamicTestCase {
 		// open another window, now that our invalid contribution is there, it
 		// should be parsed and loaded, this ensures the workbench window can
 		// still go up even if someone is contributing an invalid contribution
-		fWorkbench.openWorkbenchWindow(window.getActivePage().getPerspective().getId(), null);
+		getWorkbench().openWorkbenchWindow(window.getActivePage().getPerspective().getId(), null);
 	}
 
 	@Override

@@ -13,6 +13,8 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.internal;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.jface.action.CoolBarManager;
@@ -215,11 +217,9 @@ public class EditorActionBarsTest extends UITestCase {
 			// objects.
 			IContributionItem[] items = manager.getItems();
 			for (IContributionItem item : items) {
-				if (!(item instanceof Separator) && item.isVisible()) {
-					fail("No toolbar for a visible action text \"" + actionText + "\"");
-				}
+				assertTrue("No toolbar for a visible action text \"" + actionText + "\"",
+						item instanceof Separator || !item.isVisible());
 			}
-
 		}
 	}
 
@@ -233,22 +233,14 @@ public class EditorActionBarsTest extends UITestCase {
 		// Test a cool bar with a single separator
 		CoolBarManager coolBarManager = new CoolBarManager();
 		coolBarManager.add(new Separator(CoolBarManager.USER_SEPARATOR));
-		try {
-			coolBarManager.createControl(fWindow.getShell());
-			coolBarManager.update(true);
-		} catch (ArrayIndexOutOfBoundsException e) {
-			fail("Exception updating cool bar with a single separator");
-		}
+		coolBarManager.createControl(fWindow.getShell());
+		coolBarManager.update(true);
 
 		// Test a cool bar with multiple separators
 		CoolBarManager coolBarManager2 = new CoolBarManager();
 		coolBarManager2.add(new Separator(CoolBarManager.USER_SEPARATOR));
-		try {
-			coolBarManager2.createControl(fWindow.getShell());
-			coolBarManager2.update(true);
-		} catch (ArrayIndexOutOfBoundsException e) {
-			fail("Exception updating cool bar with multiple separators");
-		}
+		coolBarManager2.createControl(fWindow.getShell());
+		coolBarManager2.update(true);
 	}
 }
 

@@ -14,7 +14,7 @@
 
 package org.eclipse.jface.tests.performance;
 
-import java.lang.reflect.InvocationTargetException;
+import static org.eclipse.ui.tests.harness.util.UITestUtil.processEvents;
 
 import org.eclipse.jface.dialogs.ProgressMonitorDialog;
 import org.eclipse.jface.operation.IRunnableWithProgress;
@@ -80,11 +80,7 @@ public class ProgressMonitorDialogPerformanceTest extends BasicPerformanceTest {
 			}
 		};
 
-		try {
-			dialog.run(false, true, runnable);
-		} catch (InvocationTargetException | InterruptedException e) {
-			fail(e.getMessage(), e);
-		}
+		dialog.run(false, true, runnable);
 
 		commitMeasurements();
 		assertPerformance();

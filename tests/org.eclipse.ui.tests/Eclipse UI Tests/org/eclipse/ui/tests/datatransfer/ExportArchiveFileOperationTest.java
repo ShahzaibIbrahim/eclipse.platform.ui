@@ -19,6 +19,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
@@ -327,9 +328,7 @@ public class ExportArchiveFileOperationTest extends UITestCase implements
 			new File(FileSystemHelper.getRandomLocation(FileSystemHelper.getTempDir())
 				.toOSString());
 		localDirectory = destination.getAbsolutePath();
-		if (!destination.mkdirs()) {
-			fail("Could not set up destination directory for " + getName());
-		}
+		assertTrue(destination.mkdirs());
 		setUpData();
 		flattenPaths = false;
 		excludeProjectPath = false;
@@ -344,110 +343,88 @@ public class ExportArchiveFileOperationTest extends UITestCase implements
 			File[] files = root.listFiles();
 			if (files != null){
 				for (File file : files) {
-					if (!file.delete()) {
-						fail("Could not delete " + file.getAbsolutePath());
-					}
+					assertTrue("Could not delete " + file.getAbsolutePath(), file.delete());
 				}
 			}
 			root.delete();
 		}
 		try {
 			project.delete(true, true, null);
-		} catch (CoreException e) {
-			fail(e.toString());
-		}
-		finally{
+		} finally {
 			project = null;
 			localDirectory = null;
 			filePath = null;
 		}
 	}
 
-	private void setUpData(){
-		try{
-			for (String directoryName : directoryNames) {
-				IFolder folder = project.getFolder(directoryName);
-				folder.create(false, true, new NullProgressMonitor());
-				for (String fileName : fileNames) {
-					IFile file = folder.getFile(fileName);
-					String contents =
-						directoryName + ", " + fileName;
-					file.create(new ByteArrayInputStream(contents.getBytes()),
-						true, new NullProgressMonitor());
-				}
-			}
-
-			// create empty folders to test bug 278402
-			for (String emptyDirectoryName : emptyDirectoryNames) {
-				IFolder folder = project.getFolder(emptyDirectoryName);
-				folder.create(false, true, new NullProgressMonitor());
+	private void setUpData() throws CoreException {
+		for (String directoryName : directoryNames) {
+			IFolder folder = project.getFolder(directoryName);
+			folder.create(false, true, new NullProgressMonitor());
+			for (String fileName : fileNames) {
+				IFile file = folder.getFile(fileName);
+				String contents = directoryName + ", " + fileName;
+				file.create(new ByteArrayInputStream(contents.getBytes()), true, new NullProgressMonitor());
 			}
 		}
-		catch(Exception e){
-			fail(e.toString());
+
+		// create empty folders to test bug 278402
+		for (String emptyDirectoryName : emptyDirectoryNames) {
+			IFolder folder = project.getFolder(emptyDirectoryName);
+			folder.create(false, true, new NullProgressMonitor());
 		}
 	}
 
-	private void verifyCompressed(String type){
+	private void verifyCompressed(String type) throws IOException {
 		String fileName = "";
 		boolean compressed = false;
-		try {
-			if (ZIP_FILE_EXT.equals(type)) {
-				try (ZipFile zipFile = new ZipFile(filePath)) {
-					fileName = zipFile.getName();
-					Enumeration<? extends ZipEntry> entries = zipFile.entries();
-					while (entries.hasMoreElements()) {
-						ZipEntry entry = entries.nextElement();
-						compressed = entry.getMethod() == ZipEntry.DEFLATED;
-					}
-				}
-			} else {
-				File file = new File(filePath);
-				try (InputStream fin = new FileInputStream(file)) {
-					// Check if it's a GZIPInputStream.
-					try (InputStream in = new GZIPInputStream(fin)) {
-						compressed = true;
-					} catch (IOException e) {
-						compressed = false;
-					}
-					fileName = file.getName();
+		if (ZIP_FILE_EXT.equals(type)) {
+			try (ZipFile zipFile = new ZipFile(filePath)) {
+				fileName = zipFile.getName();
+				Enumeration<? extends ZipEntry> entries = zipFile.entries();
+				while (entries.hasMoreElements()) {
+					ZipEntry entry = entries.nextElement();
+					compressed = entry.getMethod() == ZipEntry.DEFLATED;
 				}
 			}
-		} catch (IOException e) {
-			fail(e.getMessage());
+		} else {
+			File file = new File(filePath);
+			try (InputStream fin = new FileInputStream(file)) {
+				// Check if it's a GZIPInputStream.
+				try (InputStream in = new GZIPInputStream(fin)) {
+					compressed = true;
+				} catch (IOException e) {
+					compressed = false;
+				}
+				fileName = file.getName();
+			}
 		}
 		assertTrue(fileName + " does not appear to be compressed.", compressed);
 	}
 
-	private void verifyFolders(int folderCount, String type){
-		try{
-			List<String> allEntries = new ArrayList<>();
-			if (ZIP_FILE_EXT.equals(type)){
-				try (ZipFile zipFile = new ZipFile(filePath)) {
-					Enumeration<? extends ZipEntry> entries = zipFile.entries();
-					while (entries.hasMoreElements()) {
-						ZipEntry entry = entries.nextElement();
-						allEntries.add(entry.getName());
-					}
+	private void verifyFolders(int folderCount, String type) throws IOException, TarException {
+		List<String> allEntries = new ArrayList<>();
+		if (ZIP_FILE_EXT.equals(type)) {
+			try (ZipFile zipFile = new ZipFile(filePath)) {
+				Enumeration<? extends ZipEntry> entries = zipFile.entries();
+				while (entries.hasMoreElements()) {
+					ZipEntry entry = entries.nextElement();
+					allEntries.add(entry.getName());
 				}
 			}
-			else{
-				try (TarFile tarFile = new TarFile(filePath)) {
-					Enumeration<?> entries = tarFile.entries();
-					while (entries.hasMoreElements()) {
-						TarEntry entry = (TarEntry) entries.nextElement();
-						allEntries.add(entry.getName());
-					}
+		} else {
+			try (TarFile tarFile = new TarFile(filePath)) {
+				Enumeration<?> entries = tarFile.entries();
+				while (entries.hasMoreElements()) {
+					TarEntry entry = (TarEntry) entries.nextElement();
+					allEntries.add(entry.getName());
 				}
-			}
-			if (flattenPaths) {
-				verifyFiles(allEntries);
-			} else {
-				verifyArchive(folderCount, allEntries);
 			}
 		}
-		catch (IOException | TarException e){
-			fail(e.getMessage());
+		if (flattenPaths) {
+			verifyFiles(allEntries);
+		} else {
+			verifyArchive(folderCount, allEntries);
 		}
 	}
 
@@ -491,16 +468,13 @@ public class ExportArchiveFileOperationTest extends UITestCase implements
 	}
 
 	private void verifyFile(String entryName){
-		for (String fileName : fileNames) {
-			boolean dotProjectFileShouldBePresent = ".project".equals(entryName) && !flattenPaths && !excludeProjectPath;
-			if (fileName.equals(entryName) || dotProjectFileShouldBePresent) {
-				return;
-			}
-		}
 		if (entryName.equals("org.eclipse.core.resources.prefs")) {
 			return;
 		}
-		fail("Could not find file named: " + entryName);
+		assertTrue("Could not find file named: " + entryName, Arrays.stream(fileNames).anyMatch(fileName -> {
+			boolean dotProjectFileShouldBePresent = ".project".equals(entryName) && !flattenPaths && !excludeProjectPath;
+			return fileName.equals(entryName) || dotProjectFileShouldBePresent;
+		}));
 	}
 
 	private void verifyFolders(Set<String> folderNames) {
@@ -509,11 +483,8 @@ public class ExportArchiveFileOperationTest extends UITestCase implements
 				continue;
 			}
 			if (!isDirectory(folderName)){
-				if (flattenPaths) {
-					fail(folderName + " is not an expected folder");
-				} else if (!project.getName().equals(folderName)) {
-					fail(folderName + " is not an expected folder");
-				}
+				assertFalse(folderName + " is not an expected folder",
+						flattenPaths || !project.getName().equals(folderName));
 			}
 		}
 	}

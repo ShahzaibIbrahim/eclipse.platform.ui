@@ -13,6 +13,9 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.themes;
 
+import static org.eclipse.ui.PlatformUI.getWorkbench;
+import static org.junit.Assert.assertArrayEquals;
+
 import org.eclipse.jface.resource.ColorDescriptor;
 import org.eclipse.jface.resource.ColorRegistry;
 import org.eclipse.jface.resource.FontRegistry;

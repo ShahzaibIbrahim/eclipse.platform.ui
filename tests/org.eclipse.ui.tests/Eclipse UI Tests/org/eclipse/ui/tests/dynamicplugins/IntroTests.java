@@ -13,6 +13,9 @@
  *******************************************************************************/
 package org.eclipse.ui.tests.dynamicplugins;
 
+import static org.eclipse.ui.tests.harness.util.UITestUtil.openTestWindow;
+import static org.junit.Assert.assertThrows;
+
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 
@@ -40,14 +43,14 @@ public class IntroTests extends DynamicTestCase {
 	private static final String INTRO_ID = "org.eclipse.newIntro1.newIntro1";
 	private IntroDescriptor oldDesc;
 	private IWorkbenchWindow window;
-	
+
 
 	public IntroTests() {
 		super(IntroTests.class.getSimpleName());
 	}
 
 	@Test
-	public void testIntroClosure() {
+	public void testIntroClosure() throws IllegalArgumentException, InterruptedException {
 		getBundle();
 		Workbench workbench = Workbench.getInstance();
 		IntroDescriptor testDesc = (IntroDescriptor) WorkbenchPlugin
@@ -61,16 +64,13 @@ public class IntroTests extends DynamicTestCase {
 		assertNotNull(intro);
 		intro = null; //null the reference
 		removeBundle();
-		try {
-			LeakTests.checkRef(queue, ref);
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+		LeakTests.checkRef(queue, ref);
+
 		assertNull(workbench.getIntroManager().getIntro());
 	}
 
 	@Test
-	public void testIntroProperties() {
+	public void testIntroProperties() throws CoreException {
 		IIntroRegistry registry = WorkbenchPlugin.getDefault().getIntroRegistry();
 		assertNull(registry.getIntroForProduct(PRODUCT_ID));
 		assertNull(registry.getIntro(INTRO_ID));
@@ -78,24 +78,11 @@ public class IntroTests extends DynamicTestCase {
 		assertNotNull(registry.getIntroForProduct(PRODUCT_ID));
 		IIntroDescriptor desc = registry.getIntro(INTRO_ID);
 		assertNotNull(desc);
-		try {
-			testIntroProperties(desc);
-		}
-		catch (CoreException e) {
-			fail(e.getMessage());
-		}
+		testIntroProperties(desc);
 		removeBundle();
 		assertNull(registry.getIntro(INTRO_ID));
 		assertNull(registry.getIntroForProduct(PRODUCT_ID));
-		try {
-			testIntroProperties(desc);
-			fail();
-		}
-		catch (CoreException e) {
-			fail(e.getMessage());
-		}
-		catch (RuntimeException e) {
-		}
+		assertThrows(RuntimeException.class, () -> testIntroProperties(desc));
 	}
 
 	private void testIntroProperties(IIntroDescriptor desc) throws CoreException {
